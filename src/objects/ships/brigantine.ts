@@ -12,33 +12,109 @@ export class Brigantine extends Ships {
         // Create custom physics body
         this.createPhysicsBody();
     }
-      protected override createPhysicsBody(): void {
-        // Since complex hull shapes may require additional plugins,
-        // we'll use a combination of simple shapes to approximate the hull
-        
-        // Scale down the hull points for physics
-        const scaleFactor = 0.2;
+    protected override createPhysicsBody(): void {
+        // Create a physics body that matches the hull shape with quadratic curves
+        const scaleFactor = 0.2; // Scale down the hull points for physics
         const p = Brigantine.HULL_POINTS;
         
-        // Calculate dimensions for the physics body
-        const bodyLength = (p.bowTip.x - p.sternTip.x) * scaleFactor;
-        const bodyWidth = (p.bow.y - p.bowBottom.y) * scaleFactor;
+        // Create vertices for a polygon body that approximates the hull shape
+        // We'll sample points along the quadratic curves to create a more accurate polygon
+        const vertices = [];
         
-        // Create a main rectangular body that represents the ship
-        this.body = Matter.Bodies.rectangle(
-            this.position.x, 
-            this.position.y, 
-            bodyLength, 
-            bodyWidth, 
+        // Number of points to sample along each curved edge
+        const curveSamples = 8;
+        
+        // Sample points along the bow curve (from bow to bowBottom through bowTip)
+        for (let i = 0; i <= curveSamples; i++) {
+            const t = i / curveSamples;
+            // Quadratic Bezier formula: (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
+            const x = Math.pow(1-t, 2) * p.bow.x + 2 * (1-t) * t * p.bowTip.x + Math.pow(t, 2) * p.bow.x;
+            const y = Math.pow(1-t, 2) * p.bow.y + 2 * (1-t) * t * p.bowTip.y + Math.pow(t, 2) * p.bowBottom.y;
+            vertices.push({ x: x * scaleFactor, y: y * scaleFactor });
+        }
+        
+        // Add stern bottom point
+        vertices.push({ 
+            x: p.sternBottom.x * scaleFactor, 
+            y: p.sternBottom.y * scaleFactor 
+        });
+        
+        // Sample points along the stern curve (from sternBottom to stern through sternTip)
+        for (let i = 0; i <= curveSamples; i++) {
+            const t = i / curveSamples;
+            // Quadratic Bezier formula: (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
+            const x = Math.pow(1-t, 2) * p.sternBottom.x + 2 * (1-t) * t * p.sternTip.x + Math.pow(t, 2) * p.stern.x;
+            const y = Math.pow(1-t, 2) * p.sternBottom.y + 2 * (1-t) * t * p.sternTip.y + Math.pow(t, 2) * p.stern.y;
+            vertices.push({ x: x * scaleFactor, y: y * scaleFactor });
+        }
+        
+        // Create the physics body from the vertices
+        this.body = Matter.Bodies.fromVertices(
+            this.position.x,
+            this.position.y,
+            [vertices],
             {
                 inertia: Infinity, // We'll control rotation manually
                 friction: 0.01,
                 frictionAir: 0.05,
                 restitution: 0.5,
-                chamfer: { radius: bodyWidth / 3 }, // Round the corners
                 label: 'brigantine'
             }
         );
+        
+        // If body creation fails (which can happen with complex shapes),
+        // fall back to a simpler approximation
+        if (!this.body) {
+            console.warn('Failed to create complex hull shape for brigantine, falling back to simpler shape');
+            
+            // Calculate dimensions for the fallback physics body
+            const bodyLength = (p.bowTip.x - p.sternTip.x) * scaleFactor;
+            const bodyWidth = (p.bow.y - p.bowBottom.y) * scaleFactor;
+            
+            // Create a polygon with 8 points that approximates the ship's shape
+            const simpleVertices = [];
+            
+            // Bow curved section (simplified with 3 points)
+            simpleVertices.push({ x: p.bow.x * scaleFactor, y: p.bow.y * scaleFactor }); // Top bow point
+            simpleVertices.push({ x: p.bowTip.x * scaleFactor, y: p.bowTip.y * scaleFactor }); // Bow tip
+            simpleVertices.push({ x: p.bow.x * scaleFactor, y: p.bowBottom.y * scaleFactor }); // Bottom bow point
+            
+            // Stern section points
+            simpleVertices.push({ x: p.sternBottom.x * scaleFactor, y: p.sternBottom.y * scaleFactor }); // Bottom stern
+            simpleVertices.push({ x: p.sternTip.x * scaleFactor, y: p.sternTip.y * scaleFactor }); // Stern tip
+            simpleVertices.push({ x: p.stern.x * scaleFactor, y: p.stern.y * scaleFactor }); // Top stern
+            
+            this.body = Matter.Bodies.fromVertices(
+                this.position.x,
+                this.position.y,
+                [simpleVertices],
+                {
+                    inertia: Infinity,
+                    friction: 0.01,
+                    frictionAir: 0.05,
+                    restitution: 0.5,
+                    label: 'brigantine'
+                }
+            );
+            
+            // If even that fails, fall back to a rectangle with chamfered corners
+            if (!this.body) {
+                this.body = Matter.Bodies.rectangle(
+                    this.position.x, 
+                    this.position.y, 
+                    bodyLength, 
+                    bodyWidth, 
+                    {
+                        inertia: Infinity,
+                        friction: 0.01,
+                        frictionAir: 0.05,
+                        restitution: 0.5,
+                        chamfer: { radius: bodyWidth / 3 },
+                        label: 'brigantine'
+                    }
+                );
+            }
+        }
     }
     
     private static readonly HULL_POINTS = {
@@ -87,8 +163,7 @@ export class Brigantine extends Ships {
     }    /**
      * Render debug visualization specific to Brigantine
      * Focuses on showing the visual hull shape rather than physics body
-     */
-    protected override renderPhysicsBody(ctx: CanvasRenderingContext2D): void {
+     */    protected override renderPhysicsBody(ctx: CanvasRenderingContext2D): void {
         // Call the base implementation first for the ship info text
         super.renderPhysicsBody(ctx);
         
@@ -105,7 +180,7 @@ export class Brigantine extends Ships {
             this.path = Brigantine.createHullPath();
         }
         
-        // Draw visual hull outline (but not the physics body - that's handled by the physics engine)
+        // Draw visual hull outline
         ctx.strokeStyle = Color.DEBUG_WARNING; // Orange for visual hull
         ctx.lineWidth = 1;
         ctx.setLineDash([5, 5]);
@@ -123,12 +198,62 @@ export class Brigantine extends Ships {
             ctx.fill();
         }
         
-        // Add text to indicate this is the visual shape, not physics body
+        // Add text to indicate this is the visual shape
         ctx.fillStyle = 'white';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('Visual Hull Shape', 0, 0);
         
-        ctx.restore();
+        // Draw physics body vertices
+        if (this.body.vertices && this.body.vertices.length > 0) {
+            // Transform back to world space for physics body
+            ctx.restore();
+            ctx.save();
+            
+            // Draw physics body vertices
+            ctx.strokeStyle = Color.DEBUG_PHYSICS;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            // Apply inverse rotation to get vertices in local space
+            const cos = Math.cos(-this.rotation);
+            const sin = Math.sin(-this.rotation);
+            
+            // Draw the outline of physics body vertices in local space for comparison
+            for (let i = 0; i < this.body.vertices.length; i++) {
+                const vertex = this.body.vertices[i];
+                // Transform to local space for comparison with visual hull
+                const dx = vertex.x - this.position.x;
+                const dy = vertex.y - this.position.y;
+                const localX = dx * cos - dy * sin;
+                const localY = dx * sin + dy * cos;
+                
+                if (i === 0) {
+                    ctx.moveTo(this.position.x + localX, this.position.y + localY);
+                } else {
+                    ctx.lineTo(this.position.x + localX, this.position.y + localY);
+                }
+            }
+            
+            // Close the path
+            if (this.body.vertices.length > 0) {
+                const vertex = this.body.vertices[0];
+                const dx = vertex.x - this.position.x;
+                const dy = vertex.y - this.position.y;
+                const localX = dx * cos - dy * sin;
+                const localY = dx * sin + dy * cos;
+                ctx.lineTo(this.position.x + localX, this.position.y + localY);
+            }
+            
+            ctx.stroke();
+            
+            // Add label for physics body outline
+            ctx.fillStyle = Color.DEBUG_PHYSICS;
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Physics Body Shape', this.position.x, this.position.y + 15);
+        } else {
+            ctx.restore();
+        }
     }
 }
