@@ -1,5 +1,6 @@
 import { BaseShipModule } from './shipModules';
 import { Color } from '../../utils/color';
+import * as Matter from 'matter-js';
 
 export class Sails extends BaseShipModule {
     private width: number;
@@ -14,8 +15,7 @@ export class Sails extends BaseShipModule {
         this.speedBoost = 2.0; // Multiplier for ship speed when sails are deployed
         this.deployed = true;
     }
-    
-    public update(delta: number): void {
+      public update(delta: number): void {
         super.update(delta);
         
         // Apply speed boost to ship if deployed
@@ -30,8 +30,12 @@ export class Sails extends BaseShipModule {
             };
             
             // Apply force to ship body
-            // This would normally be handled by the physics system
-            // For simplicity, we're just adjusting the sail mechanics here
+            if (Math.abs(velocity.x) > 0.1 || Math.abs(velocity.y) > 0.1) {
+                // Only apply additional force if the ship is already moving
+                // to prevent it from drifting when stationary
+                const body = this.ship.getBody()!;
+                Matter.Body.applyForce(body, body.position, force);
+            }
         }
     }
     
@@ -76,6 +80,63 @@ export class Sails extends BaseShipModule {
         ctx.stroke();
         
         // Restore context
+        ctx.restore();
+        
+        // Render debug visualization if enabled
+        if (this.ship && this.ship.constructor.name === 'BaseGameObject' && 
+            'isDebugMode' in this.ship.constructor && 
+            (this.ship.constructor as any).isDebugMode()) {
+            this.renderDebug(ctx);
+        }
+    }
+    
+    /**
+     * Override base renderDebug to add sail-specific debug info
+     */
+    public override renderDebug(ctx: CanvasRenderingContext2D): void {
+        // Call base class debug rendering
+        super.renderDebug(ctx);
+        
+        if (!this.ship) return;
+        
+        const pos = this.getWorldPosition();
+        const rotation = this.ship.getRotation();
+        
+        // Draw deployed/furled indicator
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        
+        // Draw speed boost text
+        ctx.font = '10px Arial';
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Counter-rotate to keep text upright
+        ctx.rotate(-rotation);
+        
+        if (this.deployed) {
+            ctx.fillText(`Boost: ${this.speedBoost.toFixed(1)}x`, 0, 0);
+            
+            // Draw wind effect when deployed
+            ctx.beginPath();
+            ctx.setLineDash([3, 3]);
+            ctx.strokeStyle = 'rgba(0, 200, 255, 0.6)';
+            
+            // Wind flow lines
+            for (let i = -2; i <= 2; i++) {
+                const y = i * 10;
+                ctx.moveTo(-30, y);
+                ctx.lineTo(30, y);
+            }
+            
+            ctx.stroke();
+            ctx.setLineDash([]);
+        } else {
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+            ctx.fillText('Furled', 0, 0);
+        }
+        
         ctx.restore();
     }
     

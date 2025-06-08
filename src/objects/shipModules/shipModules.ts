@@ -1,13 +1,15 @@
-import { Ship } from '../ships/ships';
+import { Ships } from '../ships/ships';
+import { Color } from '../../utils/color';
 
 export interface ShipModule {
     update(delta: number): void;
     render(ctx: CanvasRenderingContext2D): void;
-    attachToShip(ship: Ship): void;
+    attachToShip(ship: Ships): void;
+    renderDebug?(ctx: CanvasRenderingContext2D): void; // Add debug rendering
 }
 
 export abstract class BaseShipModule implements ShipModule {
-    protected ship: Ship | null;
+    protected ship: Ships | null;
     protected offsetX: number;
     protected offsetY: number;
     
@@ -17,7 +19,7 @@ export abstract class BaseShipModule implements ShipModule {
         this.offsetY = offsetY;
     }
     
-    public attachToShip(ship: Ship): void {
+    public attachToShip(ship: Ships): void {
         this.ship = ship;
     }
     
@@ -26,6 +28,32 @@ export abstract class BaseShipModule implements ShipModule {
     }
     
     public abstract render(ctx: CanvasRenderingContext2D): void;
+    
+    /**
+     * Render debug visualization for the ship module
+     */
+    public renderDebug(ctx: CanvasRenderingContext2D): void {
+        const pos = this.getWorldPosition();
+        
+        // Draw module connection point
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = Color.DEBUG_CONTACT;
+        ctx.fill();
+        
+        // Draw connection line to ship
+        if (this.ship) {
+            const shipPos = this.ship.getPosition();
+            ctx.beginPath();
+            ctx.moveTo(shipPos.x, shipPos.y);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)'; // Yellow for connection lines
+            ctx.setLineDash([3, 3]);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    }
     
     protected getWorldPosition(): { x: number, y: number } {
         if (!this.ship) {

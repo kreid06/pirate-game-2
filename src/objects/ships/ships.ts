@@ -2,7 +2,7 @@ import * as Matter from 'matter-js';
 import { BaseGameObject } from '../objects';
 import { Color } from '../../utils/color';
 
-export abstract class Ship extends BaseGameObject {
+export abstract class Ships extends BaseGameObject {
     protected width: number;
     protected height: number;
     protected health: number;
@@ -41,8 +41,7 @@ export abstract class Ship extends BaseGameObject {
     public isDead(): boolean {
         return this.health <= 0;
     }
-    
-    public render(ctx: CanvasRenderingContext2D): void {
+      public render(ctx: CanvasRenderingContext2D): void {
         // Save context to restore later
         ctx.save();
         
@@ -50,15 +49,20 @@ export abstract class Ship extends BaseGameObject {
         ctx.translate(this.position.x, this.position.y);
         ctx.rotate(this.rotation);
         
-        // Draw ship body (brown rectangle)
-        ctx.fillStyle = Color.SHIP_BODY;
-        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+        // // Draw ship body (brown rectangle)
+        // ctx.fillStyle = Color.SHIP_BODY;
+        // ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
         
         // Restore context
         ctx.restore();
         
         // Draw health bar above ship
         this.renderHealthBar(ctx);
+        
+        // Render debug visualization if debug mode is enabled
+        if (BaseGameObject.isDebugMode()) {
+            this.renderDebug(ctx);
+        }
     }
     
     private renderHealthBar(ctx: CanvasRenderingContext2D): void {
@@ -75,5 +79,33 @@ export abstract class Ship extends BaseGameObject {
         const healthWidth = (this.health / this.maxHealth) * barWidth;
         ctx.fillStyle = '#00FF00';
         ctx.fillRect(x, y, healthWidth, barHeight);
+    }    /**
+     * Render debug visualization of the ship
+     * This should NOT render the physics body as that's handled by the physics engine
+     */
+    protected renderPhysicsBody(ctx: CanvasRenderingContext2D): void {
+        if (!this.body) return;
+        
+        // Draw just helpful information about the ship, not the physics body itself
+        // as the physics engine already renders that
+        
+        // Add debug text for ship info
+        ctx.fillStyle = 'white';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+            `${this.constructor.name} (${Math.round(this.health)}/${this.maxHealth})`,
+            this.position.x,
+            this.position.y - 20
+        );
+        
+        // Display velocity
+        if (this.body.speed > 0.1) {
+            ctx.fillText(
+                `Speed: ${this.body.speed.toFixed(1)} px/s`,
+                this.position.x,
+                this.position.y - 5
+            );
+        }
     }
 }

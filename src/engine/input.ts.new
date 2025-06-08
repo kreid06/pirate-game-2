@@ -176,39 +176,21 @@ export class Input {
      */
     public wasKeyJustReleased(key: string): boolean {
         return this.keys.get(key.toLowerCase()) === KeyState.JUST_RELEASED;
-    }    /**
+    }
+    
+    /**
      * Simulate a key press - for testing purposes
      */
     public simulateKeyPress(key: string): void {
         const lowercaseKey = key.toLowerCase();
         console.log(`Simulating key press for: ${lowercaseKey}`);
         
-        // For P and L keys, make sure they get set to JUST_PRESSED regardless of current state
-        // This ensures they work as toggle switches
-        if (lowercaseKey === 'p' || lowercaseKey === 'l') {
-            console.log(`DEBUG: Simulating ${lowercaseKey.toUpperCase()} key press - setting to JUST_PRESSED`);
-            this.keys.set(lowercaseKey, KeyState.JUST_PRESSED);
-            return;
-        }
+        // Set the key to JUST_PRESSED state
+        this.keys.set(lowercaseKey, KeyState.JUST_PRESSED);
         
-        // For other keys, follow normal key state transition logic
-        const currentState = this.keys.get(lowercaseKey);
-        if (currentState !== KeyState.DOWN && currentState !== KeyState.JUST_PRESSED) {
-            this.keys.set(lowercaseKey, KeyState.JUST_PRESSED);
-        }
-    }
-    
-    /**
-     * Called after all game logic updates to finalize the key state transitions
-     * This should be called at the end of the game update cycle
-     */
-    public finalizeUpdate(): void {
-        // Reset toggle keys that were JUST_PRESSED
-        for (const [key, state] of this.keys.entries()) {
-            if ((key === 'p' || key === 'l') && state === KeyState.JUST_PRESSED) {
-                console.log(`Finalizing update: Setting toggle key ${key.toUpperCase()} from JUST_PRESSED to UP`);
-                this.keys.set(key, KeyState.UP);
-            }
+        // Immediately notify if this is a P or L key
+        if (lowercaseKey === 'p' || lowercaseKey === 'l') {
+            console.log(`DEBUG: Simulated ${lowercaseKey.toUpperCase()} key now in JUST_PRESSED state`);
         }
     }
 }

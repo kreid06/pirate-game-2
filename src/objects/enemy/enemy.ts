@@ -54,13 +54,44 @@ export class Enemy extends BaseGameObject {
         // Update position from physics body
         super.update(delta);
     }
-    
-    public render(ctx: CanvasRenderingContext2D): void {
+      public render(ctx: CanvasRenderingContext2D): void {
         // Draw the enemy as a green circle
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = Color.GREEN;
         ctx.fill();
         ctx.closePath();
+        
+        // Render debug visualization if debug mode is enabled
+        if (BaseGameObject.isDebugMode()) {
+            this.renderDebug(ctx);
+        }
+    }
+    
+    /**
+     * Render debug visualization of the enemy's physics body
+     */
+    protected renderPhysicsBody(ctx: CanvasRenderingContext2D): void {
+        if (!this.body) return;
+        
+        // Draw the circular physics body
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 165, 0, 0.7)'; // Orange for enemy physics body
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // If enemy has a target, draw a line to it
+        if (this.target) {
+            const targetPos = this.target.getPosition();
+            ctx.beginPath();
+            ctx.moveTo(this.position.x, this.position.y);
+            ctx.lineTo(targetPos.x, targetPos.y);
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)'; // Red for target line
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]); // Dashed line
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset to solid line
+        }
     }
 }

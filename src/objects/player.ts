@@ -9,6 +9,7 @@ export class Player extends BaseGameObject {
     private speed: number;
     private input: Input;
     private camera: Camera | null;
+    private health: number = 100; // Default health
       constructor(x: number, y: number, radius: number, input: Input) {
         super(x, y);
         this.radius = radius;
@@ -20,6 +21,13 @@ export class Player extends BaseGameObject {
         this.createPhysicsBody();
     }
     
+     public isDead(): boolean {
+        return this.health <= 0;
+    }
+
+    public heal(amount: number): void {
+        this.health += amount;
+    };
     public setCamera(camera: Camera): void {
         this.camera = camera;
     }
@@ -103,8 +111,7 @@ export class Player extends BaseGameObject {
         // Update position from physics body
         super.update(delta);
     }
-    
-    public render(ctx: CanvasRenderingContext2D): void {
+      public render(ctx: CanvasRenderingContext2D): void {
         // Draw the player as a red circle
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
@@ -123,6 +130,11 @@ export class Player extends BaseGameObject {
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.closePath();
+        
+        // Render debug visualization if debug mode is enabled
+        if (BaseGameObject.isDebugMode()) {
+            this.renderDebug(ctx);
+        }
     }
     
     /**
@@ -141,5 +153,29 @@ export class Player extends BaseGameObject {
     public getVelocity(): { x: number, y: number } {
         if (!this.body) return { x: 0, y: 0 };
         return { x: this.body.velocity.x, y: this.body.velocity.y };
+    }
+      /**
+     * Render debug visualization of the player's physics body
+     */
+    protected override renderPhysicsBody(ctx: CanvasRenderingContext2D): void {
+        if (!this.body) return;
+        
+        // Draw the circular physics body
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = Color.DEBUG_PHYSICS;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Draw the rotation indicator
+        const dirX = this.position.x + Math.cos(this.rotation) * this.radius;
+        const dirY = this.position.y + Math.sin(this.rotation) * this.radius;
+        
+        ctx.beginPath();
+        ctx.moveTo(this.position.x, this.position.y);
+        ctx.lineTo(dirX, dirY);
+        ctx.strokeStyle = Color.DEBUG_ROTATION;
+        ctx.lineWidth = 2;
+        ctx.stroke();
     }
 }

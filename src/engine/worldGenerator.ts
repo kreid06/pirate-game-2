@@ -30,6 +30,7 @@ export class WorldGenerator {
     private objectDensity: number;  // Objects per 1000x1000 area
     private generationRadius: number; // How far from camera to generate objects
     private cullingRadius: number;    // How far from camera to remove objects
+    private animationsEnabled: boolean = true; // Flag to toggle background animations
       constructor(camera: Camera, canvas: Canvas) {
         this.camera = camera;
         this.canvas = canvas;        this.parallaxLayers = [];
@@ -300,11 +301,27 @@ export class WorldGenerator {
             }
         }
     }
+      /**
+     * Toggle background animations on/off
+     * @param enabled Whether animations should be enabled
+     */
+    public setAnimationsEnabled(enabled: boolean): void {
+        this.animationsEnabled = enabled;
+    }
+    
+    /**
+     * Check if background animations are enabled
+     */
+    public areAnimationsEnabled(): boolean {
+        return this.animationsEnabled;
+    }
     
     /**
      * Update the world based on camera position
-     */
-    public update(): void {
+     */    public update(): void {
+        // Skip update if animations are disabled
+        if (!this.animationsEnabled) return;
+        
         const cameraPos = this.camera.getPosition();
         
         // Update each layer
