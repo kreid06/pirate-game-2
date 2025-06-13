@@ -210,8 +210,7 @@ export class Physics {
     }
     
     private collisionMonitorTimer: number = 0;
-    
-    /**
+      /**
      * Update the physics world
      * This should be called each frame before rendering
      * @param deltaTime Time since last update in milliseconds
@@ -220,11 +219,17 @@ export class Physics {
         // Update physics simulation with fixed time step
         Matter.Engine.update(this.engine, deltaTime);
         
-        // Periodic collision monitoring
+        // Clean up old collision points to prevent memory buildup
+        this.cleanupCollisionPoints();
+          
+        // Periodic collision monitoring - reduced frequency to only run when really needed
         this.collisionMonitorTimer += deltaTime;
-        if (this.collisionMonitorTimer > 1000) { // Check every second
+        if (this.collisionMonitorTimer > 2000) { // Check every 2 seconds instead of every second
             this.collisionMonitorTimer = 0;
-            this.manualCollisionCheck();
+            // Only perform manual checks in debug mode or if we haven't had a collision recently
+            if (BaseGameObject.isDebugMode() || !this.hasRecentCollision('player', 'brigantine')) {
+                this.manualCollisionCheck();
+            }
         }
     }
     
@@ -632,7 +637,7 @@ export class Physics {
             console.log("Missing required collision data!");
             return;
         }
-        
+
         // Log basic collision information
         if (BaseGameObject.isDebugMode()) {
             console.log(`Player-Brigantine collision handling:
@@ -642,117 +647,31 @@ export class Physics {
                 Collision normal: (${pair.collision.normal.x.toFixed(4)}, ${pair.collision.normal.y.toFixed(4)})
             `);
         }
-        
-        // Extract collision normal for calculations
-        const normal = pair.collision.normal;
-        
-        // Calculate relative velocity
-        const relVelX = playerBody.velocity.x - brigantineBody.velocity.x;
-        const relVelY = playerBody.velocity.y - brigantineBody.velocity.y;
-        
-        // Project relative velocity onto collision normal
-        const relVelDotNormal = (relVelX * normal.x) + (relVelY * normal.y);
-        
-        // Only apply impulse if objects are moving toward each other
-        if (relVelDotNormal < 0) {
-            // Calculate non-linear force based on collision depth
-            // This makes light collisions noticeable but prevents extreme forces
-            const force = Math.min(1.0, Math.pow(pair.collision.depth * 0.03, 0.75));
-            
-            // Apply immediate velocity changes for responsive collision
-            const impulse = Math.min(2.0, 0.8 + Math.abs(relVelDotNormal) * 0.5);
-            
-            // Apply impulse to player (with higher magnitude for better separation)
-            Matter.Body.setVelocity(playerBody, {
-                x: playerBody.velocity.x + normal.x * impulse * 1.2,
-                y: playerBody.velocity.y + normal.y * impulse * 1.2
-            });
-            
-            // Apply smaller counter-impulse to ship
-            Matter.Body.setVelocity(brigantineBody, {
-                x: brigantineBody.velocity.x - normal.x * impulse * 0.3,
-                y: brigantineBody.velocity.y - normal.y * impulse * 0.3
-            });
-            
-            // Apply additional separation force based on collision normal
-            // This helps prevent sticking together
-            const separationFactor = 0.02 * Math.max(1.0, Math.abs(relVelDotNormal) * 0.5);
-            const separationForce = {
-                x: normal.x * separationFactor * force * brigantineBody.mass,
-                y: normal.y * separationFactor * force * brigantineBody.mass
-            };
-            
-            // Apply force to the player (make sure player moves away from ship)
-            Matter.Body.applyForce(playerBody, playerBody.position, {
-                x: separationForce.x * 3.0, // Increased player force for better separation
-                y: separationForce.y * 3.0
-            });
-            
-            // Apply opposite force to the brigantine (reduced to make ship feel more massive)
-            Matter.Body.applyForce(brigantineBody, brigantineBody.position, {
-                x: -separationForce.x * 0.6, // Reduced to emphasize ship's mass
-                y: -separationForce.y * 0.6
-            });
-            
-            // Create visual and audio feedback for significant collisions
-            if (force > 0.3) {
-                // Get collision point
-                const collisionPoint = pair.collision.supports && pair.collision.supports.length > 0 ? 
-                    pair.collision.supports[0] : playerBody.position;
-                
-                // Size of effect based on collision force
-                const impactSize = 15 + (force * 30);
-                
-                // Create visual impact effect
-                if (this.effectManager) {
-                    this.effectManager.createCollisionImpact(collisionPoint.x, collisionPoint.y, impactSize);
-                    
-                    // Add global flash for emphasis on strong collisions
-                    if (force > 0.7) {
-                        this.effectManager.addGlobalFlash('rgba(255, 100, 50, 0.25)', 0.4);
-                    }
+
+        // Only visual and audio feedback, no extra forces/impulses
+        const force = Math.min(1.0, Math.pow(pair.collision.depth * 0.02, 0.75));
+        if (force > 0.3) {
+            // Get collision point
+            const collisionPoint = pair.collision.supports && pair.collision.supports.length > 0 ? 
+                pair.collision.supports[0] : playerBody.position;
+            // Size of effect based on collision force
+            const impactSize = 15 + (force * 30);
+            // Create visual impact effect
+            if (this.effectManager) {
+                this.effectManager.createCollisionImpact(collisionPoint.x, collisionPoint.y, impactSize);
+                // Add global flash for emphasis on strong collisions
+                if (force > 0.7) {
+                    this.effectManager.addGlobalFlash('rgba(255, 100, 50, 0.25)', 0.4);
                 }
-                
-                // Play collision sound with volume based on impact force
-                if (this.soundManager) {
-                    this.soundManager.playSound('collision', 0.3 + (force * 0.5));
-                }
-                
-                // Add torque effects for more realistic collision response
-                // Calculate torque direction based on collision point relative to ship center
-                const relativeX = collisionPoint.x - brigantineBody.position.x;
-                const relativeY = collisionPoint.y - brigantineBody.position.y;
-                
-                // Cross product to determine rotation direction
-                const torqueDirection = Math.sign(relativeX * relVelY - relativeY * relVelX);
-                
-                // Apply angular velocity change to the ship
-                const currentAngVel = brigantineBody.angularVelocity || 0;
-                Matter.Body.setAngularVelocity(brigantineBody, 
-                    currentAngVel + (torqueDirection * force * 0.012));
             }
-            
-            // Log detailed collision information in debug mode
-            if (BaseGameObject.isDebugMode()) {
-                console.log(`Applied collision response:`);
-                console.log(`  Rel velocity: (${relVelX.toFixed(2)}, ${relVelY.toFixed(2)})`);
-                console.log(`  RelVel dot normal: ${relVelDotNormal.toFixed(4)}`);
-                console.log(`  Applied impulse: ${impulse.toFixed(4)}`);
-                console.log(`  Force magnitude: ${force.toFixed(4)}`);
+            // Play collision sound with volume based on impact force
+            if (this.soundManager) {
+                this.soundManager.playSound('collision', 0.3 + (force * 0.5));
             }
-        } else {
-            // Objects are already separating, apply minimal stabilizing force
-            // This helps maintain proper separation after a collision
-            const stabilizingForce = Math.min(0.005, pair.collision.depth * 0.002) * brigantineBody.mass;
-            
-            Matter.Body.applyForce(playerBody, playerBody.position, {
-                x: normal.x * stabilizingForce * 2.0,
-                y: normal.y * stabilizingForce * 2.0
-            });
-            
-            if (BaseGameObject.isDebugMode()) {
-                console.log(`Objects already separating, applied stabilizing force`);
-            }
+        }
+        // Debug info
+        if (BaseGameObject.isDebugMode()) {
+            console.log(`Collision response handled by Matter.js. No extra forces applied.`);
         }
     }
     
@@ -848,46 +767,31 @@ export class Physics {
         if (playerBody && brigantineBody) {
             console.log("Manual collision check: Found player and brigantine bodies");
             
-            // Verify collision filtering is correct before attempting collision detection
+            // Verify collision filtering is correct before attempting collision detection            // Verify collision filtering is correct before attempting collision detection
             const canCollide = this.checkCollisionFiltering(playerBody, brigantineBody);
             
             if (canCollide) {
-                // Use the enhanced CollisionHelper to enforce the collision if needed
-                const collisionForced = CollisionHelper.enforceCollision(
-                    playerBody, brigantineBody, this.engine
-                );
+                // Calculate distance between the bodies
+                const dx = playerBody.position.x - brigantineBody.position.x;
+                const dy = playerBody.position.y - brigantineBody.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                if (collisionForced) {
-                    console.log("Synthetic collision successfully created!");
+                // Get player radius (assuming circular body)
+                const playerRadius = (playerBody.bounds.max.x - playerBody.bounds.min.x) / 2;
+                
+                // Get brigantine dimensions
+                const brigantineWidth = (brigantineBody.bounds.max.x - brigantineBody.bounds.min.x) / 2;
+                const brigantineHeight = (brigantineBody.bounds.max.y - brigantineBody.bounds.min.y) / 2;                const brigantineSize = Math.max(brigantineWidth, brigantineHeight);
+                
+                // Combined collision threshold with a small buffer for more reliable detection
+                const collisionThreshold = (playerRadius + brigantineSize) * 1.02; // Reduced buffer as ship body is now larger
+            // Check if they should be colliding based on proximity
+                if (distance < collisionThreshold) {
+                    console.log("Manual collision check: Objects are close enough to collide");
                     
-                    // Apply additional separation forces to ensure they don't overlap
-                    const dx = playerBody.position.x - brigantineBody.position.x;
-                    const dy = playerBody.position.y - brigantineBody.position.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    // Estimate the combined size of both objects for collision with more precise calculations
-                    const playerRadius = (playerBody.bounds.max.x - playerBody.bounds.min.x + 
-                                       playerBody.bounds.max.y - playerBody.bounds.min.y) / 4;
-                    
-                    const brigantineWidth = (brigantineBody.bounds.max.x - brigantineBody.bounds.min.x) / 2;
-                    const brigantineHeight = (brigantineBody.bounds.max.y - brigantineBody.bounds.min.y) / 2;
-                    
-                    // For better accuracy, consider approach angle when determining ship size
-                    const absNormalX = Math.abs(dx / (distance || 1));
-                    const absNormalY = Math.abs(dy / (distance || 1));
-                    const brigantineSize = (brigantineWidth * absNormalX) + (brigantineHeight * absNormalY);
-                    
-                    // Combined collision threshold with small buffer
-                    const collisionThreshold = (playerRadius + brigantineSize) * 1.1;
-                    
-                    // Calculate overlap depth for separation force
-                    const depth = Math.max(0, collisionThreshold - distance);
-                    
-                    // Apply enhanced separation force based on overlap depth
-                    if (depth > 0) {
-                        CollisionHelper.applySeparationForce(playerBody, brigantineBody, depth);
-                        console.log(`Applied enhanced separation force with depth: ${depth.toFixed(4)}`);
-                    }
+                    // Let Matter.js handle collision detection and response
+                    // The collision response is handled entirely in handlePlayerBrigantineCollision
+                    // if the physics engine detects the collision
                 }
             } else {
                 console.log("Collision filtering prevents collision between player and brigantine");

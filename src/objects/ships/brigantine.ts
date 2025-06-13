@@ -13,7 +13,7 @@ export class Brigantine extends Ships {
         this.createPhysicsBody();
     }    protected override createPhysicsBody(): void {
         // Create a physics body that matches the hull shape with quadratic curves
-        const scaleFactor = 0.3; // Increased scale factor for better collision detection
+        const scaleFactor = 1.0; // Doubled scale factor to better match visual representation
         const p = Brigantine.HULL_POINTS;
         
         // Create vertices for a polygon body that approximates the hull shape
@@ -33,11 +33,10 @@ export class Brigantine extends Ships {
             const y = Math.pow(1-t, 2) * p.bow.y + 2 * (1-t) * t * p.bowTip.y + Math.pow(t, 2) * p.bowBottom.y;
             vertices.push({ x: x * scaleFactor, y: y * scaleFactor });
         }
-        
-        // Add stern bottom point (with a slight outward adjustment for better collision)
+          // Add stern bottom point (with a slight outward adjustment for better collision)
         vertices.push({ 
-            x: p.sternBottom.x * scaleFactor * 1.02, 
-            y: p.sternBottom.y * scaleFactor * 1.02
+            x: p.sternBottom.x * scaleFactor * 1.05, 
+            y: p.sternBottom.y * scaleFactor * 1.05
         });
         
         // Sample points along the stern curve (from sternBottom to stern through sternTip)
@@ -55,9 +54,8 @@ export class Brigantine extends Ships {
             const dx = vertices[i].x;
             const dy = vertices[i].y;
             const len = Math.sqrt(dx*dx + dy*dy);
-            if (len > 0.01) {
-                // Expand vertex slightly outward (2% expansion)
-                const expansionFactor = 1.02;
+            if (len > 0.01) {                // Expand vertex slightly outward (5% expansion)
+                const expansionFactor = 1.05;
                 vertices[i].x *= expansionFactor;
                 vertices[i].y *= expansionFactor;
             }
@@ -68,12 +66,11 @@ export class Brigantine extends Ships {
             this.position.x,
             this.position.y,
             [vertices],
-            {
-                inertia: Infinity, // We'll control rotation manually
+            {                inertia: Infinity, // We'll control rotation manually
                 friction: 0.01,
                 frictionAir: 0.05,
                 restitution: 0.4, // Slightly lower restitution for more natural collisions
-                density: 0.03, // Increased density for better collision response
+                density: 0.015, // Reduced density to compensate for doubled size
                 collisionFilter: {
                     category: CollisionCategories.SHIP,
                     mask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE | 
@@ -95,27 +92,25 @@ export class Brigantine extends Ships {
             
             // Create a convex hull with 8 points that approximates the ship's shape
             const simpleVertices = [];
-            
-            // Create simplified ship shape with deliberately expanded collision area
-            simpleVertices.push({ x: p.bow.x * scaleFactor * 1.05, y: p.bow.y * scaleFactor * 1.05 }); // Top bow point
-            simpleVertices.push({ x: p.bowTip.x * scaleFactor * 1.05, y: p.bowTip.y * scaleFactor }); // Bow tip
-            simpleVertices.push({ x: p.bow.x * scaleFactor * 1.05, y: p.bowBottom.y * scaleFactor * 1.05 }); // Bottom bow point
+              // Create simplified ship shape with deliberately expanded collision area
+            simpleVertices.push({ x: p.bow.x * scaleFactor * 1.08, y: p.bow.y * scaleFactor * 1.08 }); // Top bow point
+            simpleVertices.push({ x: p.bowTip.x * scaleFactor * 1.08, y: p.bowTip.y * scaleFactor }); // Bow tip
+            simpleVertices.push({ x: p.bow.x * scaleFactor * 1.08, y: p.bowBottom.y * scaleFactor * 1.08 }); // Bottom bow point
             
             // Stern section points
-            simpleVertices.push({ x: p.sternBottom.x * scaleFactor * 1.05, y: p.sternBottom.y * scaleFactor * 1.05 }); // Bottom stern
-            simpleVertices.push({ x: p.sternTip.x * scaleFactor * 1.05, y: p.sternTip.y * scaleFactor }); // Stern tip
-            simpleVertices.push({ x: p.stern.x * scaleFactor * 1.05, y: p.stern.y * scaleFactor * 1.05 }); // Top stern
+            simpleVertices.push({ x: p.sternBottom.x * scaleFactor * 1.08, y: p.sternBottom.y * scaleFactor * 1.08 }); // Bottom stern
+            simpleVertices.push({ x: p.sternTip.x * scaleFactor * 1.08, y: p.sternTip.y * scaleFactor }); // Stern tip
+            simpleVertices.push({ x: p.stern.x * scaleFactor * 1.08, y: p.stern.y * scaleFactor * 1.08 }); // Top stern
             
             this.body = Matter.Bodies.fromVertices(
                 this.position.x,
                 this.position.y,
                 [simpleVertices],
                 {
-                    inertia: Infinity,
-                    friction: 0.01,
+                    inertia: Infinity,                    friction: 0.01,
                     frictionAir: 0.05,
                     restitution: 0.4, // Slightly lower restitution
-                    density: 0.03, // Increased density for better collision response
+                    density: 0.015, // Reduced density to compensate for doubled size
                     collisionFilter: {
                         category: CollisionCategories.SHIP,
                         mask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE | 
@@ -135,11 +130,10 @@ export class Brigantine extends Ships {
                     bodyLength * 1.1, // Slightly larger for better collision
                     bodyWidth * 1.1, 
                     {
-                        inertia: Infinity,
-                        friction: 0.01,
+                        inertia: Infinity,                        friction: 0.01,
                         frictionAir: 0.05,
                         restitution: 0.4, // Slightly lower restitution for more natural collisions
-                        density: 0.03, // Increased density for better collision response
+                        density: 0.015, // Reduced density to compensate for doubled size
                         chamfer: { radius: bodyWidth / 3 },
                         collisionFilter: {
                             category: CollisionCategories.SHIP,
@@ -178,20 +172,16 @@ export class Brigantine extends Ships {
         path.quadraticCurveTo(p.sternTip.x, p.sternTip.y, p.stern.x, p.stern.y);
         path.closePath();
         return path;
-    };
-
-    public render(ctx: CanvasRenderingContext2D): void {
+    };    public render(ctx: CanvasRenderingContext2D): void {
         // Call base class render to draw ship body and health bar
         super.render(ctx);
         
         // Save context
         ctx.save();
         
-        // Translate and rotate around ship center
+        // Translate and rotate around ship center - using position from physics body
         ctx.translate(this.position.x, this.position.y);
-        if (this.body) {
-            ctx.rotate(this.body.angle);
-        }
+        ctx.rotate(this.rotation); // Always use rotation from the base class, which is synced with the physics body
         
         // Draw ship hull using Path2D
         if (!this.path) {
