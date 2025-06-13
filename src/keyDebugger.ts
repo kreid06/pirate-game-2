@@ -84,15 +84,21 @@ export class KeyDebugger {
             // Test collision button
             const collisionButton = document.createElement('button');
             collisionButton.innerText = 'Test Collision';
+            collisionButton.style.marginRight = '5px';
             collisionButton.onclick = () => this.spawnBrigantineForCollision();
-            
-            // Add buttons to container
+              // Sync brigantine button
+            const syncButton = document.createElement('button');
+            syncButton.innerText = 'Sync Brigantine';
+            syncButton.onclick = () => this.syncBrigantine();
+              // Add buttons to container
             buttonContainer.appendChild(pButton);
             buttonContainer.appendChild(lButton);
             buttonContainer.appendChild(physicsButton);
             buttonContainer.appendChild(debugButton);
             buttonContainer.appendChild(logKeysButton);
             buttonContainer.appendChild(collisionButton);
+            buttonContainer.appendChild(syncButton);
+            buttonContainer.appendChild(syncButton);
             
             // Add container to debug display
             this.domElement.appendChild(buttonContainer);
@@ -165,6 +171,17 @@ export class KeyDebugger {
         
         console.log('Spawning brigantine for collision testing');
         this.gameInstance.spawnBrigantineNearPlayer();
+    }
+    
+    // Sync the brigantine's visual and physics coordinates
+    public static syncBrigantine(): void {
+        if (!this.gameInstance) {
+            console.error('Game instance not set in KeyDebugger');
+            return;
+        }
+        
+        console.log('Manually syncing brigantine visual coordinates with physics body');
+        this.gameInstance.syncBrigantineWithPhysics();
     }
     
     private static createDebugDisplay(): void {

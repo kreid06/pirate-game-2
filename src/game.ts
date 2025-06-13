@@ -200,6 +200,11 @@ export class Game {
         // Update enemy spawn timer and spawn new enemies
         this.updateEnemies(delta);
         
+        // Update all ships to sync their visual coordinates with physics bodies
+        for (const ship of this.ships) {
+            ship.update(delta);
+        }
+        
         // Handle camera zoom controls with keyboard
         if (this.input.isKeyDown('q')) {
             this.camera.zoomOut(0.02); // Zoom out slowly
@@ -256,6 +261,11 @@ export class Game {
         if (this.input.wasKeyJustPressed('m')) {
             this.soundManager.toggleMute();
             console.log(`Sound: ${this.soundManager.isMutedState() ? 'MUTED' : 'UNMUTED'}`);
+        }
+        
+        // Force sync brigantine visual and physics coordinates when pressing 'S'
+        if (this.input.wasKeyJustPressed('s')) {
+            this.syncBrigantineWithPhysics();
         }
         
         // Check for collisions between cannonballs and ships
@@ -701,9 +711,9 @@ export class Game {
         this.effectManager.addGlobalFlash(debugEnabled ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)', 0.5);
         
         console.log(`Debug mode: ${debugEnabled ? 'ON' : 'OFF'}`);
-    }
-      /**
+    }    /**
      * Log the physics state of the brigantine ship
+     * Shows both visual coordinates and physics body coordinates
      */
     private logBrigantinePhysicsState(): void {
         if (this.ships.length === 0) {
@@ -727,6 +737,39 @@ export class Game {
             Math.pow(playerPos.x - body.position.x, 2) + 
             Math.pow(playerPos.y - body.position.y, 2)
         );
+        
+        // Get brigantine visual and physics coordinates
+        const visualPos = brigantine.getPosition();
+        const visualRot = brigantine.getRotation();
+        const physicsPos = body.position;
+        const physicsRot = body.angle;
+        
+        // Check for mismatch
+        const positionMismatch = Math.sqrt(
+            Math.pow(visualPos.x - physicsPos.x, 2) + 
+            Math.pow(visualPos.y - physicsPos.y, 2)
+        );
+        const rotationMismatch = Math.abs(visualRot - physicsRot);
+        
+        console.log(`Brigantine Physics State:
+            Visual Position: (${visualPos.x.toFixed(2)}, ${visualPos.y.toFixed(2)})
+            Physics Position: (${physicsPos.x.toFixed(2)}, ${physicsPos.y.toFixed(2)})
+            Position Mismatch: ${positionMismatch.toFixed(4)} pixels
+            
+            Visual Rotation: ${visualRot.toFixed(4)} rad
+            Physics Rotation: ${physicsRot.toFixed(4)} rad
+            Rotation Mismatch: ${rotationMismatch.toFixed(6)} rad
+            
+            Distance to Player: ${distanceToPlayer.toFixed(2)} pixels
+            Velocity: (${body.velocity.x.toFixed(2)}, ${body.velocity.y.toFixed(2)})
+            Speed: ${body.speed.toFixed(2)} px/s
+            Angular Velocity: ${body.angularVelocity.toFixed(4)} rad/s
+        `);
+        
+        // Highlight significant mismatches
+        if (positionMismatch > 0.5 || rotationMismatch > 0.01) {
+            console.warn(`Significant mismatch detected between visual and physics coordinates!`);
+        }
         
         // Calculate if there's a potential collision based on bounds
         let boundsOverlap = false;
@@ -878,6 +921,32 @@ export class Game {
         // Enable physics world and debug mode to see the collision better
         if (!this.showPhysicsWorld) {
             this.togglePhysicsWorld();
+        }
+    }
+    
+    /**
+     * Force synchronization of brigantine visual coordinates with physics body
+     * This can be called when you suspect there might be a mismatch
+     */
+    public syncBrigantineWithPhysics(): void {
+        if (this.ships.length === 0) {
+            console.log("No brigantine ships found to sync");
+            return;
+        }
+        
+        // Get the first brigantine (we usually only have one)
+        const brigantine = this.ships[0];
+        
+        // Call the ship's syncWithPhysics method if it's a Brigantine
+        if (brigantine instanceof Brigantine) {
+            brigantine.syncWithPhysics();
+            
+            // Add visual feedback for sync
+            this.effectManager.addGlobalFlash('rgba(0, 255, 0, 0.2)', 0.3);
+            
+            console.log("Brigantine coordinates forcibly synchronized with physics body");
+        } else {
+            console.log("First ship is not a Brigantine instance");
         }
     }
 }

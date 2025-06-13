@@ -290,5 +290,22 @@ export class Brigantine extends Ships {
         } else {
             ctx.restore();
         }
+    }    /**
+     * Explicitly synchronize visual coordinates with physics body
+     * This method forces the visual position and rotation to match the physics body,
+     * useful as a last resort if they get out of sync
+     */
+    public syncWithPhysics(): void {
+        if (!this.body) return;
+        
+        // Update position and rotation directly from physics body
+        this.position.x = this.body.position.x;
+        this.position.y = this.body.position.y;
+        this.rotation = this.body.angle;
+        
+        console.log(`Brigantine force-synced with physics body:
+            Position: (${this.position.x.toFixed(2)}, ${this.position.y.toFixed(2)})
+            Rotation: ${this.rotation.toFixed(4)} rad
+        `);
     }
 }
