@@ -4,10 +4,20 @@ import * as Matter from 'matter-js';
 
 export class Brigantine extends Ships {
     private sailSize: number;
-    path: Path2D | null = null;    constructor(x: number, y: number) {
+    path: Path2D | null = null;
+    // Add boarding ladder properties
+    private ladderRect: { x: number, y: number, width: number, height: number };
+    private playerInLadderArea: boolean = false;
+    private playerIsHovering: boolean = false;
+    private playerIsBoarded: boolean = false;
+    
+    constructor(x: number, y: number) {
         // Brigantine is a medium-sized ship
         super(x, y, 80, 30, 100);
         this.sailSize = 40;
+        
+        // Initialize ladder rectangle (will be positioned correctly in update)
+        this.ladderRect = { x: 0, y: 0, width: 60, height: 30 };
         
         // Create custom physics body
         this.createPhysicsBody();
@@ -192,9 +202,12 @@ export class Brigantine extends Ships {
         ctx.lineWidth = 10;
         ctx.stroke(this.path!);
         
+        // Draw boarding ladder at the stern (rear) of the ship
+        this.drawBoardingLadder(ctx);
+        
         // Restore context
         ctx.restore();
-    }    /**
+    }/**
      * Render debug visualization specific to Brigantine
      * Focuses on showing the visual hull shape rather than physics body
      */
@@ -222,22 +235,56 @@ export class Brigantine extends Ships {
         ctx.stroke(this.path!);
         ctx.setLineDash([]);
         
-        // Draw hull points for reference
+        // Draw boarding ladder in debug mode too
+        this.drawBoardingLadder(ctx);
+            // Draw hull points for reference
         const p = Brigantine.HULL_POINTS;
         const points = [p.bow, p.bowTip, p.bowBottom, p.sternBottom, p.sternTip, p.stern];
         
         for (const point of points) {
+            ctx.fillStyle = Color.DEBUG_PHYSICS;
             ctx.beginPath();
-            ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = Color.DEBUG_VERTEX;
+            ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
             ctx.fill();
         }
         
-        // Add text to indicate this is the visual shape
+        // Draw ladder rectangle (precise hover area)
+        ctx.strokeStyle = this.playerIsHovering ? 'rgba(0, 255, 0, 0.8)' : 'rgba(255, 255, 0, 0.5)';
+        ctx.fillStyle = this.playerIsHovering ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 255, 0, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.fillRect(this.ladderRect.x, this.ladderRect.y, this.ladderRect.width, this.ladderRect.height);
+        ctx.strokeRect(this.ladderRect.x, this.ladderRect.y, this.ladderRect.width, this.ladderRect.height);
+        
+        // Draw ladder detection distance circle (70 units)
+        const ladderPos = { 
+            x: this.ladderRect.x + this.ladderRect.width / 2, 
+            y: this.ladderRect.y + this.ladderRect.height / 2 
+        };
+        
+        ctx.beginPath();
+        ctx.arc(ladderPos.x, ladderPos.y, 70, 0, Math.PI * 2);
+        ctx.strokeStyle = this.playerInLadderArea ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 165, 0, 0.3)';
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Add a small dot at the ladder center
+        ctx.beginPath();
+        ctx.arc(ladderPos.x, ladderPos.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+        
+        // Draw text indication for ladder state
         ctx.fillStyle = 'white';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('Visual Hull Shape', 0, 0);
+        if (this.playerInLadderArea && this.playerIsHovering) {
+            ctx.fillText('Press E to Board (In Range & Hovering)', this.ladderRect.x + this.ladderRect.width/2, this.ladderRect.y - 5);
+        } else if (this.playerInLadderArea) {
+            ctx.fillText('In Range (Hover to Board)', this.ladderRect.x + this.ladderRect.width/2, this.ladderRect.y - 5);
+        } else {
+            ctx.fillText('Ladder - Get Closer & Hover', this.ladderRect.x + this.ladderRect.width/2, this.ladderRect.y - 5);
+        }
         
         // Draw physics body vertices
         if (this.body.vertices && this.body.vertices.length > 0) {
@@ -307,5 +354,230 @@ export class Brigantine extends Ships {
             Position: (${this.position.x.toFixed(2)}, ${this.position.y.toFixed(2)})
             Rotation: ${this.rotation.toFixed(4)} rad
         `);
+    }    /**
+     * Draw a boarding ladder at the stern (rear) of the ship
+     * @param ctx The canvas rendering context
+     */
+    private drawBoardingLadder(ctx: CanvasRenderingContext2D): void {
+        const p = Brigantine.HULL_POINTS;
+        
+        // Position the ladder at the stern of the ship
+        // Calculate the ladder position - centered at the stern
+        const ladderWidth = 30;
+        const ladderLength = 60;
+        const ladderX = p.sternTip.x + 30; // Position it a bit forward from the very tip
+        const ladderY = 0; // Center it vertically
+        
+        // Store the ladder rectangle in local coordinates for collision detection
+        this.ladderRect = {
+            x: ladderX,
+            y: ladderY - ladderWidth/2,
+            width: ladderLength,
+            height: ladderWidth
+        };
+        
+        // Change color if player is hovering over the ladder
+        let baseFillColor = '#8B4513'; // Default saddle brown
+        let highlightFillColor = '#A0522D'; // Default sienna
+        
+        if (this.playerIsHovering && this.playerInLadderArea) {
+            // Highlight colors when player is hovering
+            baseFillColor = '#B25D25'; // Lighter brown
+            highlightFillColor = '#CD853F'; // Peru - even lighter brown
+            
+            // Draw interaction prompt if player is hovering
+            const promptY = ladderY - ladderWidth/2 - 15;
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Press E to board', ladderX + ladderLength/2, promptY);
+        }
+          // Create a gradient for 3D effect
+        const gradient = ctx.createLinearGradient(
+            ladderX, ladderY,
+            ladderX + ladderLength, ladderY
+        );
+        gradient.addColorStop(0, baseFillColor);
+        gradient.addColorStop(0.5, highlightFillColor);
+        gradient.addColorStop(1, baseFillColor);
+        
+        // Draw the ladder base (plank) with gradient
+        ctx.fillStyle = gradient;
+        ctx.fillRect(ladderX, ladderY - ladderWidth/2, ladderLength, ladderWidth);
+        
+        // Add a border to the ladder
+        ctx.strokeStyle = '#654321'; // Darker brown
+        ctx.lineWidth = 2;
+        ctx.strokeRect(ladderX, ladderY - ladderWidth/2, ladderLength, ladderWidth);
+        
+        // Draw interaction prompt if player is close enough and hovering
+        if (this.playerInLadderArea && this.playerIsHovering) {
+            const promptY = ladderY - ladderWidth/2 - 15;
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Press E to board', ladderX + ladderLength/2, promptY);
+            
+            // Add a subtle highlight/glow effect
+            ctx.strokeStyle = 'rgba(255, 255, 200, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(ladderX - 2, ladderY - ladderWidth/2 - 2, ladderLength + 4, ladderWidth + 4);
+        }
+        
+        // Draw ladder rungs
+        ctx.strokeStyle = '#654321'; // Darker brown
+        ctx.lineWidth = 3;
+        
+        const rungCount = 5;
+        const rungSpacing = ladderLength / (rungCount + 1);
+        
+        for (let i = 1; i <= rungCount; i++) {
+            const rungX = ladderX + i * rungSpacing;
+            
+            // Draw a rung
+            ctx.beginPath();
+            ctx.moveTo(rungX, ladderY - ladderWidth/2 + 3);
+            ctx.lineTo(rungX, ladderY + ladderWidth/2 - 3);
+            ctx.stroke();
+        }
+        
+        // Add some shadow for depth
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fillRect(ladderX, ladderY - ladderWidth/2, ladderLength, 5);
+        
+        // Add some ropes attaching the ladder to the ship
+        ctx.strokeStyle = '#5E2605'; // Dark brown for ropes
+        ctx.lineWidth = 2;
+        
+        // Left rope
+        ctx.beginPath();
+        ctx.moveTo(ladderX, ladderY - ladderWidth/2);
+        ctx.lineTo(ladderX - 15, ladderY - ladderWidth/2 - 10);
+        ctx.stroke();
+        
+        // Right rope
+        ctx.beginPath();
+        ctx.moveTo(ladderX, ladderY + ladderWidth/2);
+        ctx.lineTo(ladderX - 15, ladderY + ladderWidth/2 + 10);
+        ctx.stroke();
+    }    /**
+     * Get the ladder position in world coordinates
+     */
+    public getLadderWorldPosition(): { x: number, y: number } {
+        if (!this.body) return { x: 0, y: 0 };
+        
+        // Get the ladder center in local coordinates
+        const ladderCenterLocalX = this.ladderRect.x + this.ladderRect.width / 2;
+        const ladderCenterLocalY = this.ladderRect.y + this.ladderRect.height / 2;
+        
+        // Transform to world coordinates
+        const cos = Math.cos(this.rotation);
+        const sin = Math.sin(this.rotation);
+        const worldX = this.position.x + (ladderCenterLocalX * cos - ladderCenterLocalY * sin);
+        const worldY = this.position.y + (ladderCenterLocalX * sin + ladderCenterLocalY * cos);
+        
+        return { x: worldX, y: worldY };
+    }
+    
+    /**
+     * Check if a point in world coordinates is close enough to the ladder
+     */
+    public isPointInLadderArea(worldX: number, worldY: number, maxDistance: number = 50): boolean {
+        if (!this.body) return false;
+        
+        // Get ladder position in world coordinates
+        const ladderPos = this.getLadderWorldPosition();
+        
+        // Calculate distance from point to ladder center
+        const dx = worldX - ladderPos.x;
+        const dy = worldY - ladderPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if the distance is within the interaction range
+        return distance <= maxDistance;
+    }
+    
+    /**
+     * Check if a point in world coordinates is hovering over the ladder
+     */
+    public isPointHoveringLadder(worldX: number, worldY: number): boolean {
+        if (!this.body) return false;
+        
+        // Transform the world coordinates to ship's local coordinates
+        // First, translate to be relative to ship center
+        const relX = worldX - this.position.x;
+        const relY = worldY - this.position.y;
+        
+        // Then rotate to align with ship's local coordinate system
+        const cos = Math.cos(-this.rotation);
+        const sin = Math.sin(-this.rotation);
+        const localX = relX * cos - relY * sin;
+        const localY = relX * sin + relY * cos;
+        
+        // Check if the transformed point is inside the ladder rectangle
+        return (
+            localX >= this.ladderRect.x && 
+            localX <= this.ladderRect.x + this.ladderRect.width &&
+            localY >= this.ladderRect.y && 
+            localY <= this.ladderRect.y + this.ladderRect.height
+        );
+    }
+    
+    /**
+     * Check if the player is hovering over the ladder
+     */
+    public setPlayerHovering(isHovering: boolean): void {
+        this.playerIsHovering = isHovering;
+    }
+    
+    /**
+     * Set whether the player is in the ladder area
+     */
+    public setPlayerInLadderArea(inArea: boolean): void {
+        this.playerInLadderArea = inArea;
+    }
+    
+    /**
+     * Check if the player can board the ship
+     */
+    public canPlayerBoard(): boolean {
+        return this.playerInLadderArea && this.playerIsHovering;
+    }
+    
+    /**
+     * Set whether the player is boarded
+     */
+    public setPlayerBoarded(boarded: boolean): void {
+        this.playerIsBoarded = boarded;
+    }
+    
+    /**
+     * Check if the player is currently boarded
+     */
+    public isPlayerBoarded(): boolean {
+        return this.playerIsBoarded;
+    }
+    
+    /**
+     * Render additional UI elements when player is boarded
+     * @param ctx The canvas rendering context
+     */
+    public renderBoardedUI(ctx: CanvasRenderingContext2D): void {
+        if (!this.playerIsBoarded) return;
+        
+        // Save context for transformations
+        ctx.save();
+        
+        // Draw a "Press E to Unboard" message at the top of the screen
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, ctx.canvas.width, 30);
+        
+        ctx.fillStyle = 'white';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Press E to Unboard', ctx.canvas.width / 2, 20);
+        
+        // Restore context
+        ctx.restore();
     }
 }

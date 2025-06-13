@@ -1,0 +1,25 @@
+    /**
+     * Force synchronization of brigantine visual coordinates with physics body
+     * This can be called when you suspect there might be a mismatch
+     */
+    public syncBrigantineWithPhysics(): void {
+        if (this.ships.length === 0) {
+            console.log("No brigantine ships found to sync");
+            return;
+        }
+        
+        // Get the first brigantine (we usually only have one)
+        const brigantine = this.ships[0];
+        
+        // Call the ship's syncWithPhysics method if it's a Brigantine
+        if (brigantine instanceof Brigantine) {
+            brigantine.syncWithPhysics();
+            
+            // Add visual feedback for sync
+            this.effectManager.addGlobalFlash('rgba(0, 255, 0, 0.2)', 0.3);
+            
+            console.log("Brigantine coordinates forcibly synchronized with physics body");
+        } else {
+            console.log("First ship is not a Brigantine instance");
+        }
+    }

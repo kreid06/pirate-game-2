@@ -53,6 +53,9 @@ export class Game {
         this.soundManager = new SoundManager();
         this.effectManager = new EffectManager();
         
+        // Set up interact callback for 'E' key presses
+        this.input.setInteractCallback(this.handleInteraction.bind(this));
+        
         // Connect the effect manager to the physics engine for collision effects
         this.physics.setEffectManager(this.effectManager);
         
@@ -123,21 +126,27 @@ export class Game {
         this.soundManager.playMusic('background', true);
         
         requestAnimationFrame(this.gameLoop.bind(this));
-    }    private gameLoop(timestamp: number): void {
-        // Calculate delta time in seconds
+    }    private gameLoop(timestamp: number): void {        // Calculate delta time in seconds
         const deltaTime = (timestamp - this.lastTime) / 1000;
         this.lastTime = timestamp;
         
-        // Update input state
-        this.input.update();
+        // Debug test for key inputs - BEFORE updating input state
+        if (this.input.wasKeyJustPressed('t')) {
+            console.log('TEST KEY (T) WAS JUST PRESSED - Input system is working!');
+        }
         
         // Update physics
         this.physics.update(deltaTime * 1000); // Matter.js expects delta in ms
         
         // Update effect manager
         this.effectManager.update(deltaTime);
-          // Update game objects
+        
+        // Update game objects
         this.update(deltaTime);
+        
+        // Update input state AFTER all game logic has been processed
+        // This ensures any JUST_PRESSED keys can be detected by game logic
+        this.input.update();
         
         // Update brigantine physics logging timer if enabled
         if (this.brigantineLoggingEnabled) {
@@ -198,18 +207,19 @@ export class Game {
         this.islandGenerator.update();
         
         // Update enemy spawn timer and spawn new enemies
-        this.updateEnemies(delta);
-        
-        // Update all ships to sync their visual coordinates with physics bodies
+        this.updateEnemies(delta);        // Update all ships to sync their visual coordinates with physics bodies
         for (const ship of this.ships) {
             ship.update(delta);
         }
+        
+        // Update ships' ladder highlight states based on player proximity and mouse position
+        this.updateLadderHighlights();
         
         // Handle camera zoom controls with keyboard
         if (this.input.isKeyDown('q')) {
             this.camera.zoomOut(0.02); // Zoom out slowly
         }
-        if (this.input.isKeyDown('e')) {
+        if (this.input.isKeyDown('z')) { // Changed from 'e' to 'z' to avoid conflict with boarding
             this.camera.zoomIn(0.02); // Zoom in slowly
         }
           // Handle camera zoom with mouse wheel
@@ -302,6 +312,19 @@ export class Game {
         if (this.brigantineLogTimer >= this.brigantineLogInterval) {
             this.logBrigantinePhysicsState();
             this.brigantineLogTimer = 0;
+        }
+        
+        // Test key press handling - checks a test key to verify input handling
+        // This is for debugging input handling issues
+        if (this.input.wasKeyJustPressed('t')) {
+            console.log('=============================================');
+            console.log('TEST KEY (T) WAS JUST PRESSED - Input system is working!');
+            console.log('=============================================');
+        }
+        
+        // Log E key state for comparison
+        if (this.input.wasKeyJustPressed('e')) {
+            console.log('E KEY WAS JUST PRESSED - Detected in testKeyPressHandling');
         }
     }
     
@@ -562,7 +585,7 @@ export class Game {
                     
     //                 // Play splash sound (quieter for enemy misses)
     //                 this.soundManager.playSound('splash', 0.1 + Math.random() * 0.1);
-                    
+                
     //                 // Remove the cannonball
     //                 this.physics.removeBody(cannonball.getBody()!);
     //                 enemyCannonballs.splice(i, 1);
@@ -751,20 +774,20 @@ export class Game {
         );
         const rotationMismatch = Math.abs(visualRot - physicsRot);
         
-        console.log(`Brigantine Physics State:
-            Visual Position: (${visualPos.x.toFixed(2)}, ${visualPos.y.toFixed(2)})
-            Physics Position: (${physicsPos.x.toFixed(2)}, ${physicsPos.y.toFixed(2)})
-            Position Mismatch: ${positionMismatch.toFixed(4)} pixels
+        // console.log(`Brigantine Physics State:
+        //     Visual Position: (${visualPos.x.toFixed(2)}, ${visualPos.y.toFixed(2)})
+        //     Physics Position: (${physicsPos.x.toFixed(2)}, ${physicsPos.y.toFixed(2)})
+        //     Position Mismatch: ${positionMismatch.toFixed(4)} pixels
             
-            Visual Rotation: ${visualRot.toFixed(4)} rad
-            Physics Rotation: ${physicsRot.toFixed(4)} rad
-            Rotation Mismatch: ${rotationMismatch.toFixed(6)} rad
+        //     Visual Rotation: ${visualRot.toFixed(4)} rad
+        //     Physics Rotation: ${physicsRot.toFixed(4)} rad
+        //     Rotation Mismatch: ${rotationMismatch.toFixed(6)} rad
             
-            Distance to Player: ${distanceToPlayer.toFixed(2)} pixels
-            Velocity: (${body.velocity.x.toFixed(2)}, ${body.velocity.y.toFixed(2)})
-            Speed: ${body.speed.toFixed(2)} px/s
-            Angular Velocity: ${body.angularVelocity.toFixed(4)} rad/s
-        `);
+        //     Distance to Player: ${distanceToPlayer.toFixed(2)} pixels
+        //     Velocity: (${body.velocity.x.toFixed(2)}, ${body.velocity.y.toFixed(2)})
+        //     Speed: ${body.speed.toFixed(2)} px/s
+        //     Angular Velocity: ${body.angularVelocity.toFixed(4)} rad/s
+        // `);
         
         // Highlight significant mismatches
         if (positionMismatch > 0.5 || rotationMismatch > 0.01) {
@@ -789,65 +812,65 @@ export class Game {
             minDistance = centerDist - playerRadius - brigantineRadius;
         }
         
-        // Log physics properties
-        console.log("=== Brigantine Physics State ===");
-        console.log(`Position: (${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)})`);
-        console.log(`Velocity: (${body.velocity.x.toFixed(2)}, ${body.velocity.y.toFixed(2)})`);
-        console.log(`Speed: ${body.speed.toFixed(2)}`);
-        console.log(`Angle: ${(body.angle * 180 / Math.PI).toFixed(2)}°`);
-        console.log(`Angular Velocity: ${body.angularVelocity.toFixed(4)}`);
-        console.log(`Mass: ${body.mass.toFixed(2)}`);
-        console.log(`Inertia: ${body.inertia.toFixed(2)}`);
-        console.log(`Restitution: ${body.restitution}`);
-        console.log(`Friction: ${body.friction}`);
-        console.log(`Air Friction: ${body.frictionAir}`);
-        console.log(`Category: ${body.collisionFilter.category}`);
-        console.log(`Mask: ${body.collisionFilter.mask}`);
-        console.log(`Group: ${body.collisionFilter.group}`);
-        console.log(`Is Static: ${body.isStatic}`);
-        console.log(`Is Sleeping: ${body.isSleeping}`);
-        console.log(`Is Sensor: ${body.isSensor}`);
+        // // Log physics properties
+        // console.log("=== Brigantine Physics State ===");
+        // console.log(`Position: (${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)})`);
+        // console.log(`Velocity: (${body.velocity.x.toFixed(2)}, ${body.velocity.y.toFixed(2)})`);
+        // console.log(`Speed: ${body.speed.toFixed(2)}`);
+        // console.log(`Angle: ${(body.angle * 180 / Math.PI).toFixed(2)}°`);
+        // console.log(`Angular Velocity: ${body.angularVelocity.toFixed(4)}`);
+        // console.log(`Mass: ${body.mass.toFixed(2)}`);
+        // console.log(`Inertia: ${body.inertia.toFixed(2)}`);
+        // console.log(`Restitution: ${body.restitution}`);
+        // console.log(`Friction: ${body.friction}`);
+        // console.log(`Air Friction: ${body.frictionAir}`);
+        // console.log(`Category: ${body.collisionFilter.category}`);
+        // console.log(`Mask: ${body.collisionFilter.mask}`);
+        // console.log(`Group: ${body.collisionFilter.group}`);
+        // console.log(`Is Static: ${body.isStatic}`);
+        // console.log(`Is Sleeping: ${body.isSleeping}`);
+        // console.log(`Is Sensor: ${body.isSensor}`);
         
-        // Log player relationship
-        console.log(`Distance to Player: ${distanceToPlayer.toFixed(2)}`);
-        console.log(`Min Distance (approx): ${minDistance.toFixed(2)}`);
-        console.log(`Bounds Overlap: ${boundsOverlap ? 'YES' : 'NO'}`);
+        // // Log player relationship
+        // console.log(`Distance to Player: ${distanceToPlayer.toFixed(2)}`);
+        // console.log(`Min Distance (approx): ${minDistance.toFixed(2)}`);
+        // console.log(`Bounds Overlap: ${boundsOverlap ? 'YES' : 'NO'}`);
         
-        // Log collision bounds
-        if (body.bounds) {
-            console.log(`Bounds: min(${body.bounds.min.x.toFixed(2)}, ${body.bounds.min.y.toFixed(2)}), max(${body.bounds.max.x.toFixed(2)}, ${body.bounds.max.y.toFixed(2)})`);
-            console.log(`Size: width=${(body.bounds.max.x - body.bounds.min.x).toFixed(2)}, height=${(body.bounds.max.y - body.bounds.min.y).toFixed(2)}`);
-        }
+        // // Log collision bounds
+        // if (body.bounds) {
+        //     console.log(`Bounds: min(${body.bounds.min.x.toFixed(2)}, ${body.bounds.min.y.toFixed(2)}), max(${body.bounds.max.x.toFixed(2)}, ${body.bounds.max.y.toFixed(2)})`);
+        //     console.log(`Size: width=${(body.bounds.max.x - body.bounds.min.x).toFixed(2)}, height=${(body.bounds.max.y - body.bounds.min.y).toFixed(2)}`);
+        // }
         
-        // Log number of vertices and vertex details in the body
-        if (body.vertices) {
-            console.log(`Vertex Count: ${body.vertices.length}`);
+        // // Log number of vertices and vertex details in the body
+        // if (body.vertices) {
+        //     console.log(`Vertex Count: ${body.vertices.length}`);
             
-            // Log first few vertices to help debug complex shapes
-            if (body.vertices.length > 0 && body.vertices.length < 20) {
-                console.log("Vertex Positions (local):");
-                body.vertices.forEach((vertex, index) => {
-                    // Calculate vertex position relative to body center
-                    const relX = vertex.x - body.position.x;
-                    const relY = vertex.y - body.position.y;
-                    console.log(`  V${index}: (${relX.toFixed(2)}, ${relY.toFixed(2)})`);
-                });
-            }
-        }
+        //     // Log first few vertices to help debug complex shapes
+        //     if (body.vertices.length > 0 && body.vertices.length < 20) {
+        //         console.log("Vertex Positions (local):");
+        //         body.vertices.forEach((vertex, index) => {
+        //             // Calculate vertex position relative to body center
+        //             const relX = vertex.x - body.position.x;
+        //             const relY = vertex.y - body.position.y;
+        //             console.log(`  V${index}: (${relX.toFixed(2)}, ${relY.toFixed(2)})`);
+        //         });
+        //     }
+        // }
         
-        // Log collision properties from recent collisions if any
-        if (this.physics.hasRecentCollision('player', 'brigantine')) {
-            console.log("Recent collision detected between player and brigantine!");
-            const collisionData = this.physics.getLastCollisionData('player', 'brigantine');
-            if (collisionData) {
-                console.log(`  Collision Depth: ${collisionData.depth.toFixed(2)}`);
-                console.log(`  Collision Point: (${collisionData.point.x.toFixed(2)}, ${collisionData.point.y.toFixed(2)})`);
-                console.log(`  Collision Normal: (${collisionData.normal.x.toFixed(2)}, ${collisionData.normal.y.toFixed(2)})`);
-                console.log(`  Collision Time: ${new Date(collisionData.time).toISOString()}`);
-            }
-        }
+        // // Log collision properties from recent collisions if any
+        // if (this.physics.hasRecentCollision('player', 'brigantine')) {
+        //     console.log("Recent collision detected between player and brigantine!");
+        //     const collisionData = this.physics.getLastCollisionData('player', 'brigantine');
+        //     if (collisionData) {
+        //         console.log(`  Collision Depth: ${collisionData.depth.toFixed(2)}`);
+        //         console.log(`  Collision Point: (${collisionData.point.x.toFixed(2)}, ${collisionData.point.y.toFixed(2)})`);
+        //         console.log(`  Collision Normal: (${collisionData.normal.x.toFixed(2)}, ${collisionData.normal.y.toFixed(2)})`);
+        //         console.log(`  Collision Time: ${new Date(collisionData.time).toISOString()}`);
+        //     }
+        // }
         
-        console.log("===============================");
+        // console.log("===============================");
     }    /**
      * Spawn a brigantine ship near the player for collision testing
      * This is a public method that can be called directly from the KeyDebugger
@@ -947,6 +970,113 @@ export class Game {
             console.log("Brigantine coordinates forcibly synchronized with physics body");
         } else {
             console.log("First ship is not a Brigantine instance");
+        }
+    }    private updateLadderHighlights(): void {
+        // If there are no ships or player is already boarded, skip highlighting
+        if (this.ships.length === 0) return;
+        
+        // Get player position
+        const playerPos = this.player.getPosition();
+        
+        // Get mouse position in world coordinates
+        const mouseScreenPos = this.input.getMousePosition();
+        const mouseWorldPos = this.camera.screenToWorld(mouseScreenPos.x, mouseScreenPos.y);
+        
+        // Check each brigantine ship
+        for (const ship of this.ships) {
+            if (ship instanceof Brigantine) {
+                // Check if player is close enough to the ladder (simple distance check)
+                const playerInLadderArea = ship.isPointInLadderArea(playerPos.x, playerPos.y, 70);
+                ship.setPlayerInLadderArea(playerInLadderArea);
+                
+                // Check if mouse is hovering directly over the ladder (precise check)
+                const mouseOverLadder = ship.isPointHoveringLadder(mouseWorldPos.x, mouseWorldPos.y);
+                ship.setPlayerHovering(mouseOverLadder);
+            }
+        }
+    }
+    
+    /**
+     * Render boarding UI elements if player is currently boarded
+     * Called by the renderer after rendering all game objects
+     */
+    public renderBoardingUI(ctx: CanvasRenderingContext2D): void {
+        // Check if player is currently boarded
+        if (!this.player.isOnBoard()) return;
+        
+        // Get the boarded ship and render its UI
+        const boardedShip = this.player.getBoardedShip();
+        if (boardedShip && boardedShip instanceof Brigantine) {
+            boardedShip.renderBoardedUI(ctx);
+        }
+    }
+    
+    /**
+     * Handles interaction when the 'E' key is pressed
+     * This is called directly by the Input system
+     */
+    private handleInteraction(): void {
+        // If game is over, ignore interaction
+        if (this.gameState.isGameOver()) return;
+        
+        // Check if player is already on a ship - if so, handle unboarding
+        if (this.player.isOnBoard()) {
+            console.log('🔑 INTERACT: Player is disembarking from ship');
+            this.player.unboardShip();
+            return;
+        }
+        
+        // Otherwise, check for boarding
+        this.tryBoardNearestShip();
+    }
+    
+    /**
+     * Attempts to board the nearest ship if conditions are met
+     */
+    private tryBoardNearestShip(): void {
+        if (this.ships.length === 0) return;
+        
+        // Get player position
+        const playerPos = this.player.getPosition();
+        
+        // Get mouse position in world coordinates
+        const mouseScreenPos = this.input.getMousePosition();
+        const mouseWorldPos = this.camera.screenToWorld(mouseScreenPos.x, mouseScreenPos.y);
+        
+        // Find the nearest ship with a ladder the player can board
+        let playerInLadderArea = false;
+        let mouseHoveringLadder = false;
+        let nearestShip: Brigantine | null = null;
+        
+        // Check each brigantine ship
+        for (const ship of this.ships) {
+            if (ship instanceof Brigantine) {
+                // Check if player is close enough to the ladder
+                const inLadderArea = ship.isPointInLadderArea(playerPos.x, playerPos.y, 70);
+                ship.setPlayerInLadderArea(inLadderArea);
+                
+                // Check if mouse is hovering over the ladder
+                const isHovering = ship.isPointHoveringLadder(mouseWorldPos.x, mouseWorldPos.y);
+                ship.setPlayerHovering(isHovering);
+                
+                if (inLadderArea) {
+                    playerInLadderArea = true;
+                    nearestShip = ship;
+                }
+                
+                if (isHovering) {
+                    mouseHoveringLadder = true;
+                }
+            }
+        }
+        
+        // If all conditions are met, board the ship
+        if (playerInLadderArea && mouseHoveringLadder && nearestShip) {
+            console.log('🔑 INTERACT: Boarding conditions met, boarding ship');
+            this.player.boardShip(nearestShip);
+        } else {
+            // Log why boarding failed
+            console.log(`🔑 INTERACT: Cannot board - Player near ladder: ${playerInLadderArea ? '✅' : '❌'} | Mouse hovering ladder: ${mouseHoveringLadder ? '✅' : '❌'} | Ship available: ${nearestShip !== null ? '✅' : '❌'}`);
         }
     }
 }

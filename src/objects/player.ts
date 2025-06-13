@@ -3,6 +3,7 @@ import { BaseGameObject } from './objects';
 import { Input } from '../engine/input';
 import { Color, CollisionCategories } from '../utils/color';
 import { Camera } from '../engine/camera';
+import { Brigantine } from './ships/brigantine';
 
 export class Player extends BaseGameObject {
     private radius: number;
@@ -10,7 +11,10 @@ export class Player extends BaseGameObject {
     private input: Input;
     private camera: Camera | null;
     private health: number = 100; // Default health
-      constructor(x: number, y: number, radius: number, input: Input) {
+    private isBoarded: boolean = false;
+    private boardedShip: Brigantine | null = null;
+    
+    constructor(x: number, y: number, radius: number, input: Input) {
         super(x, y);
         this.radius = radius;
         this.speed = 0.002; // Doubled speed for better movement in an infinite world
@@ -54,9 +58,9 @@ export class Player extends BaseGameObject {
             console.log(`Player isSleeping: ${this.body.isSleeping}`);
             console.log(`Player isStatic: ${this.body.isStatic}`);
         }
-    }
-    
-    public update(delta: number): void {
+    }    public update(delta: number): void {
+        // NOTE: Boarding/unboarding is now handled by Game.handleInteraction via Input system
+        
         // Get mouse position in world coordinates
         const mouseScreenPos = this.input.getMousePosition();
         let mouseWorldPos = mouseScreenPos;
@@ -194,5 +198,77 @@ export class Player extends BaseGameObject {
         ctx.strokeStyle = Color.DEBUG_ROTATION;
         ctx.lineWidth = 2;
         ctx.stroke();
+    }    /**
+     * Board a ship - changes collision filter to avoid colliding with the ship
+     */
+    public boardShip(ship: Brigantine): void {
+        if (!this.body || this.isBoarded) {
+            console.log(`❌ BOARDING FAILED: ${this.isBoarded ? 'Player is already on a ship' : 'Player body not initialized'}`);
+            return;
+        }
+        
+        // Store reference to boarded ship
+        this.boardedShip = ship;
+        this.isBoarded = true;
+        
+        // Update ship's boarding state
+        ship.setPlayerBoarded(true);
+          // Update collision filter to ignore collisions with ships while boarded
+        const currentFilter = this.body.collisionFilter;
+        const newMask = (currentFilter.mask !== undefined) 
+            ? currentFilter.mask & ~CollisionCategories.SHIP 
+            : ~CollisionCategories.SHIP;
+          // Set new collision filter
+        this.body.collisionFilter = {
+            category: currentFilter.category,
+            mask: newMask,
+            group: currentFilter.group
+        };
+        
+        console.log(`✅ BOARDING SUCCESSFUL: Player is now onboard ship`);
+    }    /**
+     * Unboard a ship - restores normal collision filtering
+     */
+    public unboardShip(): void {
+        if (!this.body || !this.isBoarded || !this.boardedShip) {
+            console.log(`❌ UNBOARDING FAILED: ${!this.isBoarded ? 'Player is not on a ship' : 'Missing references'}`);
+            return;
+        }
+        
+        // Update ship's boarding state
+        this.boardedShip.setPlayerBoarded(false);
+        
+        // Reset boarding state
+        this.boardedShip = null;
+        this.isBoarded = false;
+          // Restore normal collision filtering
+        const currentFilter = this.body.collisionFilter;
+        const newMask = (currentFilter.mask !== undefined)
+            ? currentFilter.mask | CollisionCategories.SHIP
+            : CollisionCategories.SHIP | CollisionCategories.ENEMY | CollisionCategories.POWERUP | 
+              CollisionCategories.TREASURE | CollisionCategories.ISLAND;
+              
+        // Set new collision filter        
+        this.body.collisionFilter = {
+            category: currentFilter.category,
+            mask: newMask,
+            group: currentFilter.group
+        };
+        
+        console.log(`✅ UNBOARDING SUCCESSFUL: Player has disembarked from the ship`);
+    }
+    
+    /**
+     * Check if player is currently boarded on a ship
+     */
+    public isOnBoard(): boolean {
+        return this.isBoarded;
+    }
+    
+    /**
+     * Get the ship the player is currently on, if any
+     */
+    public getBoardedShip(): Brigantine | null {
+        return this.boardedShip;
     }
 }

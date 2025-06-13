@@ -12,6 +12,7 @@ export class Input {
     private mouseY: number;
     private mouseDown: boolean;
     private wheelDelta: number;
+    private interactCallback: (() => void) | null = null;
     
     constructor() {
         this.keys = new Map();
@@ -20,11 +21,15 @@ export class Input {
         this.mouseY = 0;
         this.mouseDown = false;
         this.wheelDelta = 0;
-        
-        // Set up event listeners
+          // Set up event listeners
         window.addEventListener('keydown', (e) => {
+            // For important game keys, prevent default browser behavior
+            if (e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 't') {
+                e.preventDefault();
+            }
+            
             this.onKeyDown(e);
-            // Don't prevent default to allow browser functionality to work
+            // Don't prevent default for other keys to allow browser functionality to work
         });
         window.addEventListener('keyup', (e) => {
             this.onKeyUp(e);
@@ -36,16 +41,44 @@ export class Input {
         window.addEventListener('wheel', (e) => this.onWheel(e));
     }
     
+    /**
+     * Register a callback to be called when the 'E' key is pressed
+     * for interaction with highlighted objects
+     */
+    public setInteractCallback(callback: () => void): void {
+        this.interactCallback = callback;
+    }
+    
     private onKeyDown(e: KeyboardEvent): void {
         const key = e.key.toLowerCase();
-        // console.log(`Raw keydown event: key=${key}, code=${e.code}, keyCode=${e.keyCode}`);
+        
+        // Special handling for E key (for boarding interactions)
+        if (key === 'e') {
+            // Stop propagation to ensure no other elements capture this event
+            e.stopPropagation();
+            
+            // Ensure we set it to JUST_PRESSED regardless of current state
+            this.keys.set(key, KeyState.JUST_PRESSED);
+            
+            // Directly trigger the interact callback when E is pressed
+            if (this.interactCallback) {
+                this.interactCallback();
+            }
+            
+            return;
+        }
+        
+        // Stop propagation for test key too
+        if (key === 't') {
+            e.stopPropagation();
+            
+            // Make T key behave like E and other toggle keys
+            this.keys.set(key, KeyState.JUST_PRESSED);
+            return;
+        }
         
         // Special handling for P and L keys for debug purposes
         if (key === 'p' || key === 'l') {
-            // console.log(`DEBUG KEY DETECTED: ${key.toUpperCase()}`);
-            
-            // FIXED: Always set to JUST_PRESSED regardless of current state to ensure toggles work
-            // console.log(`Setting ${key.toUpperCase()} to JUST_PRESSED`);
             this.keys.set(key, KeyState.JUST_PRESSED);
             return;
         }
@@ -121,9 +154,7 @@ export class Input {
         // Reset wheel delta after reading it
         this.wheelDelta = 0;
         return delta;
-    }
-    
-    /**
+    }    /**
      * Update input state - should be called once per frame
      */
     public update(): void {
@@ -133,10 +164,11 @@ export class Input {
         // Process key states that changed this frame
         for (const [key, state] of this.keys.entries()) {
             if (state === KeyState.JUST_PRESSED) {
-                // FIXED: Don't change the state of P and L keys here - let the code that checks wasKeyJustPressed do its work
-                if (key === 'p' || key === 'l') {
-                    // Leave the key in JUST_PRESSED state for now
-                    // It will transition to UP in the game's update method after handling
+                // Special keys (E, T, P, L) are treated differently
+                if (key === 'e' || key === 't' || key === 'p' || key === 'l') {
+                    // Leave these keys in JUST_PRESSED state 
+                    // They will be reset to UP after being handled
+                    // This is to ensure they work as toggle switches
                 } else {
                     // For normal keys, move from JUST_PRESSED to DOWN state
                     this.keys.set(key, KeyState.DOWN);
@@ -146,9 +178,7 @@ export class Input {
                 this.keys.set(key, KeyState.UP);
             }
         }
-    }
-    
-    /**
+    }    /**
      * Check if a key was just pressed this frame
      */
     public wasKeyJustPressed(key: string): boolean {
@@ -156,16 +186,9 @@ export class Input {
         const currentState = this.keys.get(lowercaseKey);
         const isPressed = currentState === KeyState.JUST_PRESSED;
         
-        // Add extra logging for P and L keys
-        if (lowercaseKey === 'p' || lowercaseKey === 'l') {
-            // console.log(`DEBUG: Checking if ${lowercaseKey.toUpperCase()} was just pressed: ${isPressed} (current state: ${currentState !== undefined ? KeyState[currentState] : 'undefined'})`);
-            
-            // FIXED: If this was checked and it's in JUST_PRESSED state, transition it to UP
-            // This ensures it can be pressed again
-            if (isPressed) {
-                // console.log(`Setting ${lowercaseKey.toUpperCase()} to UP after wasKeyJustPressed check`);
-                this.keys.set(lowercaseKey, KeyState.UP);
-            }
+        // After checking E or T key, set it to UP so it can be pressed again
+        if ((lowercaseKey === 'e' || lowercaseKey === 't' || lowercaseKey === 'p' || lowercaseKey === 'l') && isPressed) {
+            this.keys.set(lowercaseKey, KeyState.UP);
         }
         
         return isPressed;
@@ -196,17 +219,14 @@ export class Input {
         if (currentState !== KeyState.DOWN && currentState !== KeyState.JUST_PRESSED) {
             this.keys.set(lowercaseKey, KeyState.JUST_PRESSED);
         }
-    }
-    
-    /**
+    }    /**
      * Called after all game logic updates to finalize the key state transitions
      * This should be called at the end of the game update cycle
      */
     public finalizeUpdate(): void {
         // Reset toggle keys that were JUST_PRESSED
         for (const [key, state] of this.keys.entries()) {
-            if ((key === 'p' || key === 'l') && state === KeyState.JUST_PRESSED) {
-                // console.log(`Finalizing update: Setting toggle key ${key.toUpperCase()} from JUST_PRESSED to UP`);
+            if ((key === 'e' || key === 't' || key === 'p' || key === 'l') && state === KeyState.JUST_PRESSED) {
                 this.keys.set(key, KeyState.UP);
             }
         }

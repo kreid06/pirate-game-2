@@ -1,0 +1,75 @@
+    /**
+     * Get the input manager
+     * This is used by the KeyDebugger to simulate key presses
+     */
+    public getInput(): Input {
+        return this.input;
+    }
+
+    /**
+     * Spawn a brigantine ship near the player for collision testing
+     * This is a public method that can be called directly from the KeyDebugger
+     */
+    public spawnBrigantineNearPlayer(): void {
+        const playerPos = this.player.getPosition();
+        const playerAngle = this.player.getRotation();
+        
+        // Spawn brigantine closer to player (120 units) for more immediate collision
+        const offsetX = Math.cos(playerAngle) * 120;
+        const offsetY = Math.sin(playerAngle) * 120;
+        
+        // Create brigantine with initial velocity toward player
+        const brigantine = this.spawnBrigantine(playerPos.x + offsetX, playerPos.y + offsetY);
+        
+        // If brigantine has a physics body, give it a small initial velocity toward the player
+        if (brigantine) {
+            const body = brigantine.getBody();
+            if (body) {
+                // Calculate velocity towards player
+                const velocityMagnitude = 2; // Initial speed (reduced for more controlled test)
+                const velocityX = -Math.cos(playerAngle) * velocityMagnitude;
+                const velocityY = -Math.sin(playerAngle) * velocityMagnitude;
+                
+                // Set the initial velocity
+                Matter.Body.setVelocity(body, { x: velocityX, y: velocityY });
+                
+                // Ensure the brigantine is facing the player
+                const angleToPlayer = Math.atan2(-offsetY, -offsetX);
+                Matter.Body.setAngle(body, angleToPlayer);
+            }
+        }
+        
+        console.log("Spawned brigantine in front of player for collision testing");
+        this.effectManager.addGlobalFlash('rgba(0, 100, 255, 0.2)', 0.3);
+        
+        // Enable physics world and debug mode to see the collision better
+        if (!this.showPhysicsWorld) {
+            this.togglePhysicsWorld();
+        }
+    }
+
+    /**
+     * Force synchronization of brigantine visual coordinates with physics body
+     * This can be called when you suspect there might be a mismatch
+     */
+    public syncBrigantineWithPhysics(): void {
+        if (this.ships.length === 0) {
+            console.log("No brigantine ships found to sync");
+            return;
+        }
+        
+        // Get the first brigantine (we usually only have one)
+        const brigantine = this.ships[0];
+        
+        // Call the ship's syncWithPhysics method if it's a Brigantine
+        if (brigantine instanceof Brigantine) {
+            brigantine.syncWithPhysics();
+            
+            // Add visual feedback for sync
+            this.effectManager.addGlobalFlash('rgba(0, 255, 0, 0.2)', 0.3);
+            
+            console.log("Brigantine coordinates forcibly synchronized with physics body");
+        } else {
+            console.log("First ship is not a Brigantine instance");
+        }
+    }
