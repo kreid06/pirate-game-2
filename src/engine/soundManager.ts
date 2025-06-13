@@ -20,8 +20,7 @@ export class SoundManager {
         // Load sounds
         this.loadSounds();
     }
-    
-    private loadSounds(): void {
+      private loadSounds(): void {
         // Load all game sounds
         this.loadSound('cannon', 'sounds/cannon.mp3');
         this.loadSound('splash', 'sounds/splash.mp3');
@@ -31,6 +30,7 @@ export class SoundManager {
         this.loadSound('damage', 'sounds/damage.mp3');
         this.loadSound('sinking', 'sounds/sinking.mp3');
         this.loadSound('wave', 'sounds/wave.mp3');
+        this.loadSound('collision', 'sounds/damage.mp3'); // Reuse damage sound for ship collisions
         
         // Load music
         this.loadMusic('background', 'music/sea_shanty.mp3');

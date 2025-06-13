@@ -69,3 +69,15 @@ export class Color {
     static readonly POWERUP_SPEED: string = '#00AAFF';
     static readonly POWERUP_CANNON: string = '#FF5500';
 }
+
+// Collision categories
+export const CollisionCategories = {
+    PLAYER: 0x0001,
+    SHIP: 0x0002,
+    ENEMY: 0x0004,
+    PROJECTILE: 0x0008,
+    POWERUP: 0x0010,
+    TREASURE: 0x0020,
+    ISLAND: 0x0040,
+    ALL: 0xFFFFFFFF
+};

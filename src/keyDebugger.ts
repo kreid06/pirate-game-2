@@ -18,34 +18,34 @@ export class KeyDebugger {
         // Add global key event listeners to log all key events directly
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
-            console.log(`Direct keydown event detected: ${key} (code: ${e.code})`);
+            // console.log(`Direct keydown event detected: ${key} (code: ${e.code})`);
             
             // Update the DOM display
             this.updateKeyDisplay(key, true);
             
             // Specifically handle P and L keys for quick testing
             if (key === 'p') {
-                console.log('P key pressed directly - should toggle physics world');
+                // console.log('P key pressed directly - should toggle physics world');
             } else if (key === 'l') {
-                console.log('L key pressed directly - should toggle debug mode');
+                // console.log('L key pressed directly - should toggle debug mode');
             }
         });
         
         window.addEventListener('keyup', (e) => {
             const key = e.key.toLowerCase();
-            console.log(`Direct keyup event detected: ${key} (code: ${e.code})`);
+            // console.log(`Direct keyup event detected: ${key} (code: ${e.code})`);
             
             // Update the DOM display
             this.updateKeyDisplay(key, false);
         });
         
-        console.log('KeyDebugger initialized - direct key event listeners added');
+        // console.log('KeyDebugger initialized - direct key event listeners added');
         this.isInitialized = true;    }
     
     // Set the game instance to interact with it directly
     public static setGameInstance(game: Game): void {
         this.gameInstance = game;
-        console.log('Game instance set in KeyDebugger');
+        // console.log('Game instance set in KeyDebugger');
         
         // Add buttons to the debug display for direct control
         if (this.domElement) {
@@ -75,11 +75,16 @@ export class KeyDebugger {
             debugButton.innerText = 'Toggle Debug';
             debugButton.style.marginRight = '5px';
             debugButton.onclick = () => this.toggleDebugMode();
-            
-            // Log keys button
+              // Log keys button
             const logKeysButton = document.createElement('button');
             logKeysButton.innerText = 'Log Keys';
+            logKeysButton.style.marginRight = '5px';
             logKeysButton.onclick = () => this.logKeyStates();
+            
+            // Test collision button
+            const collisionButton = document.createElement('button');
+            collisionButton.innerText = 'Test Collision';
+            collisionButton.onclick = () => this.spawnBrigantineForCollision();
             
             // Add buttons to container
             buttonContainer.appendChild(pButton);
@@ -87,6 +92,7 @@ export class KeyDebugger {
             buttonContainer.appendChild(physicsButton);
             buttonContainer.appendChild(debugButton);
             buttonContainer.appendChild(logKeysButton);
+            buttonContainer.appendChild(collisionButton);
             
             // Add container to debug display
             this.domElement.appendChild(buttonContainer);
@@ -143,11 +149,22 @@ export class KeyDebugger {
             return;
         }
         
-        console.log('Logging key states:');
-        console.log('P key is down:', this.gameInstance.getInput().isKeyDown('p'));
-        console.log('L key is down:', this.gameInstance.getInput().isKeyDown('l'));
-        console.log('P key was just pressed:', this.gameInstance.getInput().wasKeyJustPressed('p'));
-        console.log('L key was just pressed:', this.gameInstance.getInput().wasKeyJustPressed('l'));
+        // console.log('Logging key states:');
+        // console.log('P key is down:', this.gameInstance.getInput().isKeyDown('p'));
+        // console.log('L key is down:', this.gameInstance.getInput().isKeyDown('l'));
+        // console.log('P key was just pressed:', this.gameInstance.getInput().wasKeyJustPressed('p'));
+        // console.log('L key was just pressed:', this.gameInstance.getInput().wasKeyJustPressed('l'));
+    }
+    
+    // Spawn a brigantine ship close to the player for collision testing
+    public static spawnBrigantineForCollision(): void {
+        if (!this.gameInstance) {
+            console.error('Game instance not set in KeyDebugger');
+            return;
+        }
+        
+        console.log('Spawning brigantine for collision testing');
+        this.gameInstance.spawnBrigantineNearPlayer();
     }
     
     private static createDebugDisplay(): void {

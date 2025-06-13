@@ -1,7 +1,7 @@
 import * as Matter from 'matter-js';
 import { BaseGameObject } from './objects';
 import { Input } from '../engine/input';
-import { Color } from '../utils/color';
+import { Color, CollisionCategories } from '../utils/color';
 import { Camera } from '../engine/camera';
 
 export class Player extends BaseGameObject {
@@ -23,23 +23,40 @@ export class Player extends BaseGameObject {
     
      public isDead(): boolean {
         return this.health <= 0;
-    }
-
-    public heal(amount: number): void {
+    }    public heal(amount: number): void {
         this.health += amount;
-    };
+    }
+    
     public setCamera(camera: Camera): void {
         this.camera = camera;
-    }
-      protected override createPhysicsBody(): void {
+    }    protected override createPhysicsBody(): void {
         // Create physics body for player (circular)
         this.body = Matter.Bodies.circle(this.position.x, this.position.y, this.radius, {
             inertia: Infinity, // Prevents rotation from collisions
-            friction: 0.005, // Reduced friction for smoother movement
-            frictionAir: 0.02, // Reduced air friction for longer movement
-            restitution: 0.8, // Bouncy
+            friction: 0.01, // Slightly higher friction for better control during collisions
+            frictionAir: 0.01, // Reduced air friction for longer movement
+            restitution: 0.6, // Increased bounciness for better collision response
+            collisionFilter: {
+                category: CollisionCategories.PLAYER,
+                mask: CollisionCategories.SHIP | CollisionCategories.ENEMY | CollisionCategories.POWERUP | 
+                      CollisionCategories.TREASURE | CollisionCategories.ISLAND,
+                group: 0
+            },
+            density: 0.02, // Increased density for more impactful ship-player collisions
+            label: 'player'
         });
-    }public update(delta: number): void {
+          // Make sure the physics body is correctly initialized
+        if (this.body) {
+            console.log("Player physics body created successfully");
+            console.log(`Player position: (${this.position.x}, ${this.position.y})`);
+            console.log(`Player collision category: ${this.body.collisionFilter.category}`);
+            console.log(`Player collision mask: ${this.body.collisionFilter.mask}`);
+            console.log(`Player isSleeping: ${this.body.isSleeping}`);
+            console.log(`Player isStatic: ${this.body.isStatic}`);
+        }
+    }
+    
+    public update(delta: number): void {
         // Get mouse position in world coordinates
         const mouseScreenPos = this.input.getMousePosition();
         let mouseWorldPos = mouseScreenPos;

@@ -1,6 +1,6 @@
 import * as Matter from 'matter-js';
 import { BaseGameObject } from '../objects';
-import { Color } from '../../utils/color';
+import { Color, CollisionCategories } from '../../utils/color';
 
 export abstract class Ships extends BaseGameObject {
     protected width: number;
@@ -14,13 +14,18 @@ export abstract class Ships extends BaseGameObject {
         this.height = height;
         this.health = health;
         this.maxHealth = health;
-        
-        // Create ship physics body (rectangle)
+          // Create ship physics body (rectangle)
         this.body = Matter.Bodies.rectangle(x, y, width, height, {
             inertia: Infinity, // We'll control rotation manually
             friction: 0.01,
             frictionAir: 0.05,
             restitution: 0.5,
+            collisionFilter: {
+                category: CollisionCategories.SHIP,
+                mask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE | 
+                      CollisionCategories.SHIP | CollisionCategories.ISLAND,
+                group: 0
+            },
         });
     }
     

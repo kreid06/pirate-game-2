@@ -1,0 +1,142 @@
+1:import { Canvas } from './utils/canvas';
+2:import { Physics } from './engine/physics';
+3:import { Renderer } from './engine/renderer';
+4:import { Input } from './engine/input';
+5:import { Camera } from './engine/camera';
+6:import { WorldGenerator } from './engine/worldGenerator';
+7:import { IslandGenerator } from './engine/islandGenerator';
+8:import { GameStateManager, GameState } from './engine/gameState';
+9:import { Player } from './objects/player';
+10:import { SoundManager } from './engine/soundManager';
+11:import { BaseGameObject } from './objects/objects';
+12:import { EnemyShip } from './objects/ships/enemyShip';
+13:import { Treasure, TreasureType } from './objects/treasure/treasure';
+14:import { PowerUp, PowerUpType } from './objects/powerup/powerup';
+15:import { EffectManager } from './objects/effects/effectManager';
+16:import { WaterSplash } from './objects/effects/waterSplash';
+17:import { Explosion } from './objects/effects/explosion';
+18:import { Cannons } from './objects/shipModules/cannons';
+20:import { Brigantine } from './objects/ships/brigantine';
+21:import { Ships } from './objects/ships/ships';
+116:    }
+126:    }    private gameLoop(timestamp: number): void {
+148:            }
+149:        }
+161:        }
+166:        }
+167:    }    private update(delta: number): void {
+172:            }
+174:        }
+189:        }
+206:        }
+209:        }
+217:            } else {
+219:            }
+220:        }        // Toggle debug mode with L key - now acts like a toggle switch
+232:            console.log(`Debug mode: ${debugEnabled ? 'ON' : 'OFF'}`);
+233:        }
+248:            }
+252:            console.log(`Physics world: ${this.showPhysicsWorld ? 'VISIBLE' : 'HIDDEN'}`);
+253:        }
+258:            console.log(`Sound: ${this.soundManager.isMutedState() ? 'MUTED' : 'UNMUTED'}`);
+259:        }
+270:        }
+274:        }
+288:        }
+295:        }
+296:    }
+335:                    console.log(`Collected treasure worth ${value} points!`);
+336:                }
+337:            }
+359:                    }
+367:                    console.log(`Collected ${powerUp.getType()} power-up!`);
+368:                }
+369:            }
+370:        }
+371:    }
+381:        }
+398:            }
+399:        }
+400:    }    private spawnBrigantine(spawnX: number, spawnY: number): Brigantine {
+406:        console.log(`Spawned brigantine at (${Math.round(spawnX)}, ${Math.round(spawnY)})`);
+408:    }
+435:        console.log(`Spawned enemy ship at (${Math.round(spawnX)}, ${Math.round(spawnY)})`);
+436:    }
+484:    //                 }
+485:    //             }
+486:    //         }
+487:    //     }
+515:    //                 }
+516:    //             }
+517:    //         }
+518:    //     }
+537:    //         }
+538:    //     }
+559:    //             }
+560:    //         }
+561:    //     }
+562:    // }
+574:    //         }
+577:    //         }
+578:    //     }
+584:    //         }
+587:    //         }
+588:    //     }
+591:    // }
+620:        }
+631:    }
+649:        ctx.fillText(`Score: ${this.gameState.getScore()}`, canvasWidth / 2, canvasHeight / 2);
+650:        ctx.fillText(`Ships Destroyed: ${this.gameState.getShipsDestroyed()}`, canvasWidth / 2, canvasHeight / 2 + 30);
+651:        ctx.fillText(`High Score: ${this.gameState.getHighScore()}`, canvasWidth / 2, canvasHeight / 2 + 60);
+657:    }
+664:    }
+681:        }
+686:        console.log(`Physics world: ${this.showPhysicsWorld ? 'VISIBLE' : 'HIDDEN'}`);
+687:    }
+703:        console.log(`Debug mode: ${debugEnabled ? 'ON' : 'OFF'}`);
+704:    }
+712:        }
+721:        }
+747:        }
+751:        console.log(`Position: (${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)})`);
+752:        console.log(`Velocity: (${body.velocity.x.toFixed(2)}, ${body.velocity.y.toFixed(2)})`);
+753:        console.log(`Speed: ${body.speed.toFixed(2)}`);
+754:        console.log(`Angle: ${(body.angle * 180 / Math.PI).toFixed(2)}°`);
+755:        console.log(`Angular Velocity: ${body.angularVelocity.toFixed(4)}`);
+756:        console.log(`Mass: ${body.mass.toFixed(2)}`);
+757:        console.log(`Inertia: ${body.inertia.toFixed(2)}`);
+758:        console.log(`Restitution: ${body.restitution}`);
+759:        console.log(`Friction: ${body.friction}`);
+760:        console.log(`Air Friction: ${body.frictionAir}`);
+761:        console.log(`Category: ${body.collisionFilter.category}`);
+762:        console.log(`Mask: ${body.collisionFilter.mask}`);
+763:        console.log(`Group: ${body.collisionFilter.group}`);
+764:        console.log(`Is Static: ${body.isStatic}`);
+765:        console.log(`Is Sleeping: ${body.isSleeping}`);
+766:        console.log(`Is Sensor: ${body.isSensor}`);
+769:        console.log(`Distance to Player: ${distanceToPlayer.toFixed(2)}`);
+770:        console.log(`Min Distance (approx): ${minDistance.toFixed(2)}`);
+771:        console.log(`Bounds Overlap: ${boundsOverlap ? 'YES' : 'NO'}`);
+775:            console.log(`Bounds: min(${body.bounds.min.x.toFixed(2)}, ${body.bounds.min.y.toFixed(2)}), max(${body.bounds.max.x.toFixed(2)}, ${body.bounds.max.y.toFixed(2)})`);
+776:            console.log(`Size: width=${(body.bounds.max.x - body.bounds.min.x).toFixed(2)}, height=${(body.bounds.max.y - body.bounds.min.y).toFixed(2)}`);
+777:        }
+781:            console.log(`Vertex Count: ${body.vertices.length}`);
+790:                    console.log(`  V${index}: (${relX.toFixed(2)}, ${relY.toFixed(2)})`);
+791:                });
+792:            }
+793:        }
+800:                console.log(`  Collision Depth: ${collisionData.depth.toFixed(2)}`);
+801:                console.log(`  Collision Point: (${collisionData.point.x.toFixed(2)}, ${collisionData.point.y.toFixed(2)})`);
+802:                console.log(`  Collision Normal: (${collisionData.normal.x.toFixed(2)}, ${collisionData.normal.y.toFixed(2)})`);
+803:                console.log(`  Collision Time: ${new Date(collisionData.time).toISOString()}`);
+804:            }
+805:        }
+808:    }    /**
+833:                Matter.Body.setVelocity(body, { x: velocityX, y: velocityY });
+838:            }
+839:        }
+847:        }
+848:    }
+854:        }
+855:    }
+856:}

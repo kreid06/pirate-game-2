@@ -38,14 +38,14 @@ export class Input {
     
     private onKeyDown(e: KeyboardEvent): void {
         const key = e.key.toLowerCase();
-        console.log(`Raw keydown event: key=${key}, code=${e.code}, keyCode=${e.keyCode}`);
+        // console.log(`Raw keydown event: key=${key}, code=${e.code}, keyCode=${e.keyCode}`);
         
         // Special handling for P and L keys for debug purposes
         if (key === 'p' || key === 'l') {
-            console.log(`DEBUG KEY DETECTED: ${key.toUpperCase()}`);
+            // console.log(`DEBUG KEY DETECTED: ${key.toUpperCase()}`);
             
             // FIXED: Always set to JUST_PRESSED regardless of current state to ensure toggles work
-            console.log(`Setting ${key.toUpperCase()} to JUST_PRESSED`);
+            // console.log(`Setting ${key.toUpperCase()} to JUST_PRESSED`);
             this.keys.set(key, KeyState.JUST_PRESSED);
             return;
         }
@@ -63,7 +63,7 @@ export class Input {
         
         // Special handling for P and L keys
         if (key === 'p' || key === 'l') {
-            console.log(`DEBUG KEY RELEASED: ${key.toUpperCase()}`);
+            // console.log(`DEBUG KEY RELEASED: ${key.toUpperCase()}`);
             // FIXED: Set to UP state immediately to allow the key to be pressed again
             this.keys.set(key, KeyState.UP);
             return;
@@ -101,9 +101,9 @@ export class Input {
         const result = state === KeyState.DOWN || state === KeyState.JUST_PRESSED;
         
         // For movement keys, log the state to help debug
-        if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(lowercaseKey)) {
-            console.log(`isKeyDown(${lowercaseKey}): ${result} (state: ${state !== undefined ? KeyState[state] : 'undefined'})`);
-        }
+        // if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(lowercaseKey)) {
+        //     console.log(`isKeyDown(${lowercaseKey}): ${result} (state: ${state !== undefined ? KeyState[state] : 'undefined'})`);
+        // }
         
         return result;
     }
@@ -158,12 +158,12 @@ export class Input {
         
         // Add extra logging for P and L keys
         if (lowercaseKey === 'p' || lowercaseKey === 'l') {
-            console.log(`DEBUG: Checking if ${lowercaseKey.toUpperCase()} was just pressed: ${isPressed} (current state: ${currentState !== undefined ? KeyState[currentState] : 'undefined'})`);
+            // console.log(`DEBUG: Checking if ${lowercaseKey.toUpperCase()} was just pressed: ${isPressed} (current state: ${currentState !== undefined ? KeyState[currentState] : 'undefined'})`);
             
             // FIXED: If this was checked and it's in JUST_PRESSED state, transition it to UP
             // This ensures it can be pressed again
             if (isPressed) {
-                console.log(`Setting ${lowercaseKey.toUpperCase()} to UP after wasKeyJustPressed check`);
+                // console.log(`Setting ${lowercaseKey.toUpperCase()} to UP after wasKeyJustPressed check`);
                 this.keys.set(lowercaseKey, KeyState.UP);
             }
         }
@@ -181,12 +181,12 @@ export class Input {
      */
     public simulateKeyPress(key: string): void {
         const lowercaseKey = key.toLowerCase();
-        console.log(`Simulating key press for: ${lowercaseKey}`);
+        // console.log(`Simulating key press for: ${lowercaseKey}`);
         
         // For P and L keys, make sure they get set to JUST_PRESSED regardless of current state
         // This ensures they work as toggle switches
         if (lowercaseKey === 'p' || lowercaseKey === 'l') {
-            console.log(`DEBUG: Simulating ${lowercaseKey.toUpperCase()} key press - setting to JUST_PRESSED`);
+            // console.log(`DEBUG: Simulating ${lowercaseKey.toUpperCase()} key press - setting to JUST_PRESSED`);
             this.keys.set(lowercaseKey, KeyState.JUST_PRESSED);
             return;
         }
@@ -206,7 +206,7 @@ export class Input {
         // Reset toggle keys that were JUST_PRESSED
         for (const [key, state] of this.keys.entries()) {
             if ((key === 'p' || key === 'l') && state === KeyState.JUST_PRESSED) {
-                console.log(`Finalizing update: Setting toggle key ${key.toUpperCase()} from JUST_PRESSED to UP`);
+                // console.log(`Finalizing update: Setting toggle key ${key.toUpperCase()} from JUST_PRESSED to UP`);
                 this.keys.set(key, KeyState.UP);
             }
         }
