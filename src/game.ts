@@ -422,19 +422,28 @@ export class Game {
             if (enemy.isDead()) {
                 // Remove from physics engine
                 this.physics.removeBody(enemy.getBody()!);
-                
-                // Remove from renderer
+                  // Remove from renderer
                 this.renderer.removeGameObject(enemy);
                 
                 // Remove from enemies array
                 this.enemies.splice(i, 1);
             }
         }
-    }    private spawnBrigantine(spawnX: number, spawnY: number): Brigantine {
+    }
+      private spawnBrigantine(spawnX: number, spawnY: number): Brigantine {
         // Create a new brigantine enemy ship
         const brigantine: Brigantine = new Brigantine(spawnX, spawnY);
         this.physics.addBody(brigantine.getBody()!);
         this.renderer.addGameObject(brigantine);
+        
+        // Create the plank bodies for the ship
+        try {
+            // Call the createPlankBodies method using explicit type assertion
+            (brigantine as any).createPlankBodies(this.physics);
+        } catch (error) {
+            console.error("Error creating plank bodies:", error);
+        }
+        
         this.ships.push(brigantine);
         console.log(`Spawned brigantine at (${Math.round(spawnX)}, ${Math.round(spawnY)})`);
         return brigantine;
