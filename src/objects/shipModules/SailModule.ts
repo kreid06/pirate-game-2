@@ -136,13 +136,11 @@ export class SailModule extends BaseModule {
         const worldX = shipBody.position.x + 
             (this.position.x * Math.cos(angle) - this.position.y * Math.sin(angle));
         const worldY = shipBody.position.y + 
-            (this.position.x * Math.sin(angle) + this.position.y * Math.cos(angle));
-        
-        // Create the mast body - this is a DECK_ELEMENT that the player can collide with
+            (this.position.x * Math.sin(angle) + this.position.y * Math.cos(angle));        // Create the mast body - this is a DECK_ELEMENT that the player can collide with
         this.mastBody = Matter.Bodies.circle(
             worldX,
             worldY,
-            15, // Match the visual size in the draw method
+            15, // Reduced to match the radius in Brigantine.MASTS (15) and visual size
             {
                 isStatic: true,
                 collisionFilter: {
@@ -327,11 +325,9 @@ export class SailModule extends BaseModule {
      */
     draw(ctx: CanvasRenderingContext2D): void {
         ctx.save();
-        ctx.translate(this.position.x, this.position.y);
-        
-        // Draw mast
+        ctx.translate(this.position.x, this.position.y);        // Draw mast
         ctx.beginPath();
-        ctx.arc(0, 0, 15, 0, Math.PI * 2);
+        ctx.arc(0, 0, 15, 0, Math.PI * 2); // Reduced visual size to 15 (half of physics body size)
         ctx.fillStyle = '#D2B48C';
         ctx.strokeStyle = '#8B4513';
         ctx.lineWidth = 4;

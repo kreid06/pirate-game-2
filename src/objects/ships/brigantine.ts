@@ -49,23 +49,26 @@ export class Brigantine extends Ships {
         // Brigantine is a medium-sized ship
         super(x, y, 80, 30, 100);
         this.sailSize = 40;
-        
-        // Initialize ladder rectangle (will be positioned correctly in update)
+          // Initialize ladder rectangle (will be positioned correctly in update)
         this.ladderRect = { x: 0, y: 0, width: 60, height: 30 };
-          // Initialize ship modules based on mast positions
-        const mainSail = new SailModule({ x: 0, y: 0 }); // Main mast (center)
-        const foreSail = new SailModule({ x: 100, y: 0 }); // Fore mast (front)
-        const wheel = new WheelModule({ x: -90, y: 0 }); // Steering wheel (back)
+          // Initialize ship modules using the positions from MASTS and WHEEL constants
+        const frontSail = new SailModule({ x: Brigantine.MASTS[0].x, y: Brigantine.MASTS[0].y }); // Front mast (165, 0)
+        const middleSail = new SailModule({ x: Brigantine.MASTS[1].x, y: Brigantine.MASTS[1].y }); // Middle mast (-35, 0)
+        const backSail = new SailModule({ x: Brigantine.MASTS[2].x, y: Brigantine.MASTS[2].y }); // Back mast (-235, 0)
+        const wheel = new WheelModule({ x: Brigantine.WHEEL.x, y: Brigantine.WHEEL.y }); // Steering wheel (-90, 0)
         
         // Add modules to the ship
-        this.addModule('main_sail', mainSail);
-        this.addModule('fore_sail', foreSail);
+        this.addModule('front_sail', frontSail);
+        this.addModule('middle_sail', middleSail);
+        this.addModule('back_sail', backSail);
         this.addModule('wheel', wheel);
         
         // Create custom physics body
         this.createPhysicsBody();
     }
     
+
+
     /**
      * Add a module to the ship
      */
@@ -750,37 +753,24 @@ export class Brigantine extends Ships {
             ctx.lineTo(rungX, ladderY + ladderWidth/2 - 3);
             ctx.stroke();
         }
-    }
-      /**
+    }    /**
      * Define the mast positions for the ship
-     */
-    private static readonly MASTS = [
-        { x: 100, y: 0, r: 15 },   // Front mast (fore)
-        { x: 0, y: 0, r: 15 },     // Middle mast (main)
-        { x: -235, y: 0, r: 15 },  // Back mast (mizzen)
+     */    private static readonly MASTS = [
+        { x: 165, y: 0, r: 15 },   // Front mast
+        { x: -35, y: 0, r: 15 },   // Middle mast
+        { x: -235, y: 0, r: 15 },  // Back mast
     ];
     
     /**
      * Define the wheel position and shape
      */
-    private static readonly WHEEL = { x: -90, y: 0, w: 20, h: 40 };    /**
+    private static readonly WHEEL = { x: -90, y: 0, w: 20, h: 40 };/**
      * Draw the ship's masts
      * Note: This only draws mast bases. The SailModule handles drawing the mast posts and sails.
-     */
-    private drawMasts(ctx: CanvasRenderingContext2D): void {
-        // Draw mast bases only - the SailModule handles drawing the mast posts and sails
-        for (const mast of Brigantine.MASTS) {
-            // Draw mast base
-            ctx.fillStyle = '#8B4513'; // Brown
-            ctx.beginPath();
-            ctx.arc(mast.x, mast.y, mast.r, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#654321'; // Darker brown for border
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            // No longer draw mast posts here - the SailModule handles that
-        }
+     */    private drawMasts(ctx: CanvasRenderingContext2D): void {
+        // No longer draw mast bases here as the SailModule handles all mast drawing
+        // This method is kept for backward compatibility but doesn't draw anything
+        // The visual mast appearance is now fully managed by the SailModule
     }
     
     /**
@@ -1270,11 +1260,12 @@ export class Brigantine extends Ships {
         
         // Draw the planks (instead of a simple stroke)
         this.drawPlanks(ctx);
+          // Draw the boarding ladder
+        this.drawBoardingLadder(ctx);
         
-        // Draw the boarding ladder
-        this.drawBoardingLadder(ctx);        // Draw the masts
-        this.drawMasts(ctx);
-          // Draw ship modules
+        // No longer call drawMasts since SailModule handles all mast drawing
+        
+        // Draw ship modules
         this.modules.forEach((module: BaseModule) => {
             if (module instanceof SailModule) {
                 module.draw(ctx);
