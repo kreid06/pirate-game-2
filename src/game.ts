@@ -897,54 +897,54 @@ export class Game {
         // If brigantine has a physics body, give it a small initial velocity toward the player
         if (brigantine) {
             const body = brigantine.getBody();
-            if (body) {
-                // Calculate velocity towards player
-                const velocityMagnitude = 2; // Initial speed (reduced for more controlled test)
-                const velocityX = -Math.cos(playerAngle) * velocityMagnitude;
-                const velocityY = -Math.sin(playerAngle) * velocityMagnitude;
+            // if (body) {
+            //     // Calculate velocity towards player
+            //     const velocityMagnitude = 2; // Initial speed (reduced for more controlled test)
+            //     const velocityX = -Math.cos(playerAngle) * velocityMagnitude;
+            //     const velocityY = -Math.sin(playerAngle) * velocityMagnitude;
                 
-                // Set the initial velocity
-                Matter.Body.setVelocity(body, { x: velocityX, y: velocityY });
+            //     // Set the initial velocity
+            //     Matter.Body.setVelocity(body, { x: velocityX, y: velocityY });
                 
-                // Ensure the brigantine is facing the player
-                const angleToPlayer = Math.atan2(-offsetY, -offsetX);
-                Matter.Body.setAngle(body, angleToPlayer);
+            //     // Ensure the brigantine is facing the player
+            //     const angleToPlayer = Math.atan2(-offsetY, -offsetX);
+            //     Matter.Body.setAngle(body, angleToPlayer);
                 
-                // Test collision filtering between player and brigantine
-                const playerBody = this.player.getBody();
-                if (playerBody) {
-                    // Check if collision filtering is set up correctly
-                    this.physics.checkCollisionFiltering(playerBody, body);
+            //     // Test collision filtering between player and brigantine
+            //     const playerBody = this.player.getBody();
+            //     if (playerBody) {
+            //         // Check if collision filtering is set up correctly
+            //         this.physics.checkCollisionFiltering(playerBody, body);
                     
-                    // Log positions for debugging
-                    console.log(`Player position: (${playerBody.position.x.toFixed(2)}, ${playerBody.position.y.toFixed(2)})`);
-                    console.log(`Brigantine position: (${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)})`);
-                    console.log(`Distance between bodies: ${
-                        Math.sqrt(
-                            Math.pow(playerBody.position.x - body.position.x, 2) +
-                            Math.pow(playerBody.position.y - body.position.y, 2)
-                        ).toFixed(2)
-                    }`);
+            //         // Log positions for debugging
+            //         console.log(`Player position: (${playerBody.position.x.toFixed(2)}, ${playerBody.position.y.toFixed(2)})`);
+            //         console.log(`Brigantine position: (${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)})`);
+            //         console.log(`Distance between bodies: ${
+            //             Math.sqrt(
+            //                 Math.pow(playerBody.position.x - body.position.x, 2) +
+            //                 Math.pow(playerBody.position.y - body.position.y, 2)
+            //             ).toFixed(2)
+            //         }`);
                     
-                    // Increase size of the physics bodies to make collision more likely
-                    // This is for testing purposes only
-                    console.log("Increasing physics body sizes for more reliable collision detection");
+            //         // Increase size of the physics bodies to make collision more likely
+            //         // This is for testing purposes only
+            //         console.log("Increasing physics body sizes for more reliable collision detection");
                     
-                    // Slightly increase player's collision radius by scaling
-                    const scaleFactor = 1.2; // 20% larger
-                    const scale = {
-                        x: scaleFactor,
-                        y: scaleFactor
-                    };
+            //         // Slightly increase player's collision radius by scaling
+            //         const scaleFactor = 1.2; // 20% larger
+            //         const scale = {
+            //             x: scaleFactor,
+            //             y: scaleFactor
+            //         };
                     
-                    // Scale up the player's physics body
-                    Matter.Body.scale(playerBody, scale.x, scale.y);
-                    console.log(`Player body scaled by ${scaleFactor}x`);
+            //         // Scale up the player's physics body
+            //         Matter.Body.scale(playerBody, scale.x, scale.y);
+            //         console.log(`Player body scaled by ${scaleFactor}x`);
                     
-                    // Also check for manual collision
-                    this.physics.manualCollisionCheck();
-                }
-            }
+            //         // Also check for manual collision
+            //         this.physics.manualCollisionCheck();
+            //     }
+            // }
         }
         
         console.log("Spawned brigantine in front of player for collision testing");

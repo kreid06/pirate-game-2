@@ -796,44 +796,44 @@ export class Brigantine extends Ships {
                     ];
                     
                     for (const testForce of testForces) {
-                        // Calculate adjusted force
-                        const adjustedForce = this.calculateDeckMovementForce(
-                            worldCoords.x, worldCoords.y,
-                            testForce.x, testForce.y,
-                            ctx
-                        );
+                        // // Calculate adjusted force
+                        // const adjustedForce = this.calculateDeckMovementForce(
+                        //     worldCoords.x, worldCoords.y,
+                        //     testForce.x, testForce.y,
+                        //     ctx
+                        // );
                         
-                        // Draw force vector
-                        const scaleFactor = 2000;  // Scale up the tiny force for visibility
-                        ctx.beginPath();
-                        ctx.moveTo(worldCoords.x, worldCoords.y);
-                        ctx.lineTo(
-                            worldCoords.x + adjustedForce.x * scaleFactor,
-                            worldCoords.y + adjustedForce.y * scaleFactor
-                        );
-                        ctx.strokeStyle = 'rgba(0, 100, 255, 0.7)';
-                        ctx.lineWidth = 1;
-                        ctx.stroke();
+                        // // Draw force vector
+                        // const scaleFactor = 2000;  // Scale up the tiny force for visibility
+                        // ctx.beginPath();
+                        // ctx.moveTo(worldCoords.x, worldCoords.y);
+                        // ctx.lineTo(
+                        //     worldCoords.x + adjustedForce.x * scaleFactor,
+                        //     worldCoords.y + adjustedForce.y * scaleFactor
+                        // );
+                        // ctx.strokeStyle = 'rgba(0, 100, 255, 0.7)';
+                        // ctx.lineWidth = 1;
+                        // ctx.stroke();
                         
-                        // Draw arrowhead
-                        const arrowSize = 4;
-                        const angle = Math.atan2(adjustedForce.y, adjustedForce.x);
-                        ctx.beginPath();
-                        ctx.moveTo(
-                            worldCoords.x + adjustedForce.x * scaleFactor,
-                            worldCoords.y + adjustedForce.y * scaleFactor
-                        );
-                        ctx.lineTo(
-                            worldCoords.x + adjustedForce.x * scaleFactor - arrowSize * Math.cos(angle - Math.PI/6),
-                            worldCoords.y + adjustedForce.y * scaleFactor - arrowSize * Math.sin(angle - Math.PI/6)
-                        );
-                        ctx.lineTo(
-                            worldCoords.x + adjustedForce.x * scaleFactor - arrowSize * Math.cos(angle + Math.PI/6),
-                            worldCoords.y + adjustedForce.y * scaleFactor - arrowSize * Math.sin(angle + Math.PI/6)
-                        );
-                        ctx.closePath();
-                        ctx.fillStyle = 'rgba(0, 100, 255, 0.7)';
-                        ctx.fill();
+                        // // Draw arrowhead
+                        // const arrowSize = 4;
+                        // const angle = Math.atan2(adjustedForce.y, adjustedForce.x);
+                        // ctx.beginPath();
+                        // ctx.moveTo(
+                        //     worldCoords.x + adjustedForce.x * scaleFactor,
+                        //     worldCoords.y + adjustedForce.y * scaleFactor
+                        // );
+                        // ctx.lineTo(
+                        //     worldCoords.x + adjustedForce.x * scaleFactor - arrowSize * Math.cos(angle - Math.PI/6),
+                        //     worldCoords.y + adjustedForce.y * scaleFactor - arrowSize * Math.sin(angle - Math.PI/6)
+                        // );
+                        // ctx.lineTo(
+                        //     worldCoords.x + adjustedForce.x * scaleFactor - arrowSize * Math.cos(angle + Math.PI/6),
+                        //     worldCoords.y + adjustedForce.y * scaleFactor - arrowSize * Math.sin(angle + Math.PI/6)
+                        // );
+                        // ctx.closePath();
+                        // ctx.fillStyle = 'rgba(0, 100, 255, 0.7)';
+                        // ctx.fill();
                     }
                 }
             }
@@ -885,119 +885,119 @@ export class Brigantine extends Ships {
      * @param ctx Canvas context for path checking
      * @returns Modified force that respects deck boundaries
      */
-    public calculateDeckMovementForce(
-        worldX: number, worldY: number, 
-        forceX: number, forceY: number, 
-        ctx: CanvasRenderingContext2D
-    ): { x: number, y: number } {
-        // If no force is applied, just return zero force
-        if (forceX === 0 && forceY === 0) {
-            return { x: 0, y: 0 };
-        }
+    // public calculateDeckMovementForce(
+    //     worldX: number, worldY: number, 
+    //     forceX: number, forceY: number, 
+    //     ctx: CanvasRenderingContext2D
+    // ): { x: number, y: number } {
+    //     // If no force is applied, just return zero force
+    //     if (forceX === 0 && forceY === 0) {
+    //         return { x: 0, y: 0 };
+    //     }
         
-        // Transform position to ship's local space
-        const localX = worldX - this.position.x;
-        const localY = worldY - this.position.y;
-        const cosA = Math.cos(-this.rotation);
-        const sinA = Math.sin(-this.rotation);
-        const rotatedX = localX * cosA - localY * sinA;
-        const rotatedY = localX * sinA + localY * cosA;
+    //     // Transform position to ship's local space
+    //     const localX = worldX - this.position.x;
+    //     const localY = worldY - this.position.y;
+    //     const cosA = Math.cos(-this.rotation);
+    //     const sinA = Math.sin(-this.rotation);
+    //     const rotatedX = localX * cosA - localY * sinA;
+    //     const rotatedY = localX * sinA + localY * cosA;
 
-        // Transform force to ship's local space
-        const localForceX = forceX * cosA - forceY * sinA;
-        const localForceY = forceX * sinA + forceY * cosA;
+    //     // Transform force to ship's local space
+    //     const localForceX = forceX * cosA - forceY * sinA;
+    //     const localForceY = forceX * sinA + forceY * cosA;
         
-        // Boundary check parameters
-        const checkDistance = 25; // How far ahead to check
-        const edgeRepulsionFactor = 1.5; // How strongly to push away from edges
-        let resultForceX = localForceX;
-        let resultForceY = localForceY;
+    //     // Boundary check parameters
+    //     const checkDistance = 25; // How far ahead to check
+    //     const edgeRepulsionFactor = 1.5; // How strongly to push away from edges
+    //     let resultForceX = localForceX;
+    //     let resultForceY = localForceY;
         
-        // Project the position forward based on the force to check for collisions
-        const projectedX = rotatedX + localForceX * checkDistance;
-        const projectedY = rotatedY + localForceY * checkDistance;
+    //     // Project the position forward based on the force to check for collisions
+    //     const projectedX = rotatedX + localForceX * checkDistance;
+    //     const projectedY = rotatedY + localForceY * checkDistance;
         
-        // Check if the projected position is on the deck
-        const onDeck = this.isPointInLocalPath(projectedX, projectedY, ctx);
+    //     // Check if the projected position is on the deck
+    //     const onDeck = this.isPointInLocalPath(projectedX, projectedY, ctx);
         
-        // Check obstacles (masts)
-        let tooCloseToMast = false;
-        let closestMast = { x: 0, y: 0, r: 0, dist: Number.MAX_VALUE };
+    //     // Check obstacles (masts)
+    //     let tooCloseToMast = false;
+    //     let closestMast = { x: 0, y: 0, r: 0, dist: Number.MAX_VALUE };
         
-        for (const mast of Brigantine.MASTS) {
-            const dx = projectedX - mast.x;
-            const dy = projectedY - mast.y;
-            const distSq = dx * dx + dy * dy;
-            const minDistSq = Math.pow(mast.r + 15, 2); // Slightly larger boundary than visual
+    //     for (const mast of Brigantine.MASTS) {
+    //         const dx = projectedX - mast.x;
+    //         const dy = projectedY - mast.y;
+    //         const distSq = dx * dx + dy * dy;
+    //         const minDistSq = Math.pow(mast.r + 15, 2); // Slightly larger boundary than visual
             
-            if (distSq < minDistSq && distSq < closestMast.dist) {
-                tooCloseToMast = true;
-                closestMast = { ...mast, dist: distSq };
-            }
-        }
+    //         if (distSq < minDistSq && distSq < closestMast.dist) {
+    //             tooCloseToMast = true;
+    //             closestMast = { ...mast, dist: distSq };
+    //         }
+    //     }
         
-        // Check wheel obstacle
-        const wheelDx = projectedX - Brigantine.WHEEL.x;
-        const wheelDy = projectedY - Brigantine.WHEEL.y;
-        const tooCloseToWheel = Math.abs(wheelDx) < Brigantine.WHEEL.w/2 + 15 && 
-                               Math.abs(wheelDy) < Brigantine.WHEEL.h/2 + 15;
+    //     // Check wheel obstacle
+    //     const wheelDx = projectedX - Brigantine.WHEEL.x;
+    //     const wheelDy = projectedY - Brigantine.WHEEL.y;
+    //     const tooCloseToWheel = Math.abs(wheelDx) < Brigantine.WHEEL.w/2 + 15 && 
+    //                            Math.abs(wheelDy) < Brigantine.WHEEL.h/2 + 15;
         
-        // Apply corrective forces
-        if (!onDeck) {
-            // Find the closest edge and apply a repulsive force
-            const edgePoints = this.findClosestEdgePoint(rotatedX, rotatedY);
-            if (edgePoints) {
-                const edgeDx = rotatedX - edgePoints.x;
-                const edgeDy = rotatedY - edgePoints.y;
-                const edgeDist = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+    //     // Apply corrective forces
+    //     if (!onDeck) {
+    //         // Find the closest edge and apply a repulsive force
+    //         const edgePoints = this.findClosestEdgePoint(rotatedX, rotatedY);
+    //         if (edgePoints) {
+    //             const edgeDx = rotatedX - edgePoints.x;
+    //             const edgeDy = rotatedY - edgePoints.y;
+    //             const edgeDist = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
                 
-                if (edgeDist > 0) {
-                    // Normalize and apply repulsion
-                    resultForceX += (edgeDx / edgeDist) * edgeRepulsionFactor;
-                    resultForceY += (edgeDy / edgeDist) * edgeRepulsionFactor;
-                }
-            }
-        }
+    //             if (edgeDist > 0) {
+    //                 // Normalize and apply repulsion
+    //                 resultForceX += (edgeDx / edgeDist) * edgeRepulsionFactor;
+    //                 resultForceY += (edgeDy / edgeDist) * edgeRepulsionFactor;
+    //             }
+    //         }
+    //     }
         
-        if (tooCloseToMast) {
-            // Apply repulsive force away from mast
-            const mastDx = rotatedX - closestMast.x;
-            const mastDy = rotatedY - closestMast.y;
-            const mastDist = Math.sqrt(mastDx * mastDx + mastDy * mastDy);
+    //     if (tooCloseToMast) {
+    //         // Apply repulsive force away from mast
+    //         const mastDx = rotatedX - closestMast.x;
+    //         const mastDy = rotatedY - closestMast.y;
+    //         const mastDist = Math.sqrt(mastDx * mastDx + mastDy * mastDy);
             
-            if (mastDist > 0) {
-                resultForceX += (mastDx / mastDist) * edgeRepulsionFactor;
-                resultForceY += (mastDy / mastDist) * edgeRepulsionFactor;
-            }
-        }
+    //         if (mastDist > 0) {
+    //             resultForceX += (mastDx / mastDist) * edgeRepulsionFactor;
+    //             resultForceY += (mastDy / mastDist) * edgeRepulsionFactor;
+    //         }
+    //     }
         
-        if (tooCloseToWheel) {
-            // Apply repulsive force away from wheel
-            const wheelDx = rotatedX - Brigantine.WHEEL.x;
-            const wheelDy = rotatedY - Brigantine.WHEEL.y;
-            const wheelDist = Math.sqrt(wheelDx * wheelDx + wheelDy * wheelDy);
+    //     if (tooCloseToWheel) {
+    //         // Apply repulsive force away from wheel
+    //         const wheelDx = rotatedX - Brigantine.WHEEL.x;
+    //         const wheelDy = rotatedY - Brigantine.WHEEL.y;
+    //         const wheelDist = Math.sqrt(wheelDx * wheelDx + wheelDy * wheelDy);
             
-            if (wheelDist > 0) {
-                resultForceX += (wheelDx / wheelDist) * edgeRepulsionFactor;
-                resultForceY += (wheelDy / wheelDist) * edgeRepulsionFactor;
-            }
-        }
+    //         if (wheelDist > 0) {
+    //             resultForceX += (wheelDx / wheelDist) * edgeRepulsionFactor;
+    //             resultForceY += (wheelDy / wheelDist) * edgeRepulsionFactor;
+    //         }
+    //     }
         
-        // Normalize the resulting force to maintain consistent force magnitude
-        const resultMag = Math.sqrt(resultForceX * resultForceX + resultForceY * resultForceY);
-        const originalMag = Math.sqrt(localForceX * localForceX + localForceY * localForceY);
+    //     // Normalize the resulting force to maintain consistent force magnitude
+    //     const resultMag = Math.sqrt(resultForceX * resultForceX + resultForceY * resultForceY);
+    //     const originalMag = Math.sqrt(localForceX * localForceX + localForceY * localForceY);
         
-        if (resultMag > 0 && originalMag > 0) {
-            resultForceX = (resultForceX / resultMag) * originalMag;
-            resultForceY = (resultForceY / resultMag) * originalMag;
-        }
+    //     if (resultMag > 0 && originalMag > 0) {
+    //         resultForceX = (resultForceX / resultMag) * originalMag;
+    //         resultForceY = (resultForceY / resultMag) * originalMag;
+    //     }
         
-        // Transform force back to world space
-        const worldForceX = resultForceX * Math.cos(this.rotation) - resultForceY * Math.sin(this.rotation);
-        const worldForceY = resultForceX * Math.sin(this.rotation) + resultForceY * Math.cos(this.rotation);
+    //     // Transform force back to world space
+    //     const worldForceX = resultForceX * Math.cos(this.rotation) - resultForceY * Math.sin(this.rotation);
+    //     const worldForceY = resultForceX * Math.sin(this.rotation) + resultForceY * Math.cos(this.rotation);
         
-        return { x: worldForceX, y: worldForceY };
-    }
+    //     return { x: worldForceX, y: worldForceY };
+    // }
     
     /**
      * Check if a point in local ship coordinates is within the hull path
@@ -1252,11 +1252,9 @@ export class Brigantine extends Ships {
     }    /**
      * Create physics bodies for the ship's planks (hull sections)
      * @param physics The physics engine instance
-     */    
-    public createPlankBodies(physics: Physics): void {
+     */      public createPlankBodies(physics: Physics): void {
         console.log("Creating plank bodies for brigantine...");
-        
-        // Clear any existing plank bodies
+          // Clear any existing plank bodies
         if (this.plankBodies.length > 0) {
             console.log(`Removing ${this.plankBodies.length} existing plank bodies`);
             for (const body of this.plankBodies) {
@@ -1264,6 +1262,12 @@ export class Brigantine extends Ships {
             }
             this.plankBodies = [];
         }
+        
+        // Remove any existing constraints
+        this.removeAllPlankConstraints(physics);
+        
+        // Remove any existing constraints
+        this.removeAllPlankConstraints(physics);
         
         // Clear segments
         this.plankSegments = [];
@@ -1289,14 +1293,21 @@ export class Brigantine extends Ships {
                 // Calculate segment angle
                 const angle = Math.atan2(dy, dx);
                 
-                // Create a rectangle body for the segment
+                // Calculate world position based on ship position and rotation
+                const cosRot = Math.cos(this.rotation);
+                const sinRot = Math.sin(this.rotation);
+                const worldX = this.position.x + midX * cosRot - midY * sinRot;
+                const worldY = this.position.y + midX * sinRot + midY * cosRot;
+                
+                // Create a rectangle body for the segment                
                 const body = Matter.Bodies.rectangle(
-                    this.position.x + midX,
-                    this.position.y + midY,                    length,
+                    worldX,
+                    worldY,
+                    length,
                     segment.thickness,
                     {
-                        angle: angle,
-                        isStatic: false, // Make planks part of the physics simulation
+                        angle: this.rotation + angle,
+                        isStatic: true, // Make planks static - they won't be affected by physics
                         collisionFilter: {
                             category: CollisionCategories.SHIP,
                             mask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE | 
@@ -1305,10 +1316,7 @@ export class Brigantine extends Ships {
                         },
                         render: {
                             visible: false // We'll render these manually
-                        },                        friction: 0.05,
-                        frictionAir: 0.01,
-                        restitution: 0.2,
-                        density: 0.01, // Lower density than the main ship body
+                        },
                         label: `brigantine_plank_${segment.sectionName}_${segment.index}`
                     }
                 );
@@ -1318,17 +1326,8 @@ export class Brigantine extends Ships {
                 
                 // Add the body to the world
                 Matter.World.add(physics.getWorld(), body);
-                  // Create a constraint to attach the plank to the ship body
-                if (this.body) {
-                    const constraint = Matter.Constraint.create({
-                        bodyA: this.body,
-                        bodyB: body,
-                        stiffness: 1.0, // Maximum stiffness to keep planks firmly attached
-                        length: 0,      // Zero length to prevent any stretching
-                        damping: 0.1    // Small amount of damping to prevent vibration
-                    });
-                    Matter.World.add(physics.getWorld(), constraint);
-                }
+                
+                // No constraints needed - we'll directly update positions in updatePlankBodies
                 
                 // Store the body for later reference
                 this.plankBodies.push(body);
@@ -1355,9 +1354,15 @@ export class Brigantine extends Ships {
                 const segment = this.plankSegments[i];
                 const body = this.plankBodies[i];
                 
-                // Calculate segment properties in world space
+                // Calculate segment properties in local space
                 const midX = (segment.start.x + segment.end.x) / 2;
                 const midY = (segment.start.y + segment.end.y) / 2;
+                
+                // Calculate segment angle in local space
+                const segmentAngle = Math.atan2(
+                    segment.end.y - segment.start.y,
+                    segment.end.x - segment.start.x
+                );
                 
                 // Calculate world position based on ship position and rotation
                 const cosRot = Math.cos(this.rotation);
@@ -1365,18 +1370,20 @@ export class Brigantine extends Ships {
                 const worldX = this.position.x + midX * cosRot - midY * sinRot;
                 const worldY = this.position.y + midX * sinRot + midY * cosRot;
                 
-                // Update body position and rotation
+                // Directly set position and rotation without using physics forces
+                // This ensures planks move exactly with the ship without constraints
                 Matter.Body.setPosition(body, { x: worldX, y: worldY });
-                Matter.Body.setAngle(body, this.rotation + Math.atan2(
-                    segment.end.y - segment.start.y,
-                    segment.end.x - segment.start.x
-                ));
+                Matter.Body.setAngle(body, this.rotation + segmentAngle);
+                  // Reset velocities to match the ship's velocity to ensure consistent movement
+                if (this.body) {
+                    Matter.Body.setVelocity(body, this.body.velocity);
+                    Matter.Body.setAngularVelocity(body, 0);
+                }
             }
         } catch (error) {
             console.error("Error updating plank bodies:", error);
         }
-    }
-      /**
+    }      /**
      * Draw the ship's planks (hull sections)
      * @param ctx The canvas rendering context
      */
@@ -1436,7 +1443,10 @@ export class Brigantine extends Ships {
                 ctx.beginPath();
                 ctx.arc(nailX, nailY, 2, 0, Math.PI * 2);
                 ctx.fill();
-            }        }        // Draw debug visualization of plank bodies if in debug mode
+            }
+        }
+        
+        // Draw debug visualization of plank bodies if in debug mode
         if (BaseGameObject.isDebugMode() && this.plankBodies.length > 0) {
             // Save the current transform
             ctx.save();
@@ -1462,8 +1472,15 @@ export class Brigantine extends Ships {
                     color = 'rgba(100, 255, 100, 0.8)'; // Light green for starboard side
                 }
                 
+                // Highlight static planks differently
+                if (body.isStatic) {
+                    // Add blue component to indicate static status
+                    color = color.replace(')', ', 0.9)').replace('rgba', 'rgba');
+                }
+                
                 // Draw body outline with the selected color
                 ctx.strokeStyle = color;
+                ctx.fillStyle = color.replace('0.8', '0.3'); // More transparent fill
                 ctx.lineWidth = 2; // Thicker lines
                 ctx.setLineDash([]); // Solid lines for plank physics bodies
                 
@@ -1477,81 +1494,36 @@ export class Brigantine extends Ships {
                     // Transform to local space for comparison with visual hull
                     const dx = vertex.x - this.position.x;
                     const dy = vertex.y - this.position.y;
-                    const localX = dx * cos - dy * sin;
-                    const localY = dx * sin + dy * cos;
+                    const x = dx * cos - dy * sin;
+                    const y = dx * sin + dy * cos;
                     
                     if (j === 0) {
-                        ctx.moveTo(localX, localY);
+                        ctx.moveTo(x, y);
                     } else {
-                        ctx.lineTo(localX, localY);
+                        ctx.lineTo(x, y);
                     }
                 }
                 
-                // Close the path
-                if (body.vertices.length > 0) {
-                    const vertex = body.vertices[0];
-                    const dx = vertex.x - this.position.x;
-                    const dy = vertex.y - this.position.y;
-                    const localX = dx * cos - dy * sin;
-                    const localY = dx * sin + dy * cos;
-                    ctx.lineTo(localX, localY);
-                }                
+                ctx.closePath();
+                ctx.fill();
                 ctx.stroke();
-                ctx.setLineDash([]);
                 
-                // Add index number to each plank for easier identification
+                // Label the plank section
                 ctx.fillStyle = 'white';
-                ctx.font = '10px Arial';
+                ctx.font = '8px Arial';
                 
-                // Calculate center position of the body
-                let centerX = 0;
-                let centerY = 0;
+                // Calculate center of body in local space
+                const bodyDx = body.position.x - this.position.x;
+                const bodyDy = body.position.y - this.position.y;
+                const bodyX = bodyDx * cos - bodyDy * sin;
+                const bodyY = bodyDx * sin + bodyDy * cos;
                 
-                for (let j = 0; j < body.vertices.length; j++) {
-                    const vertex = body.vertices[j];
-                    const dx = vertex.x - this.position.x;
-                    const dy = vertex.y - this.position.y;
-                    const localX = dx * cos - dy * sin;
-                    const localY = dx * sin + dy * cos;
-                    
-                    centerX += localX;
-                    centerY += localY;
+                ctx.fillText(section, bodyX, bodyY);
+                
+                // Add 'static' label if body is static
+                if (body.isStatic) {
+                    ctx.fillText('static', bodyX, bodyY + 10);
                 }
-                
-                if (body.vertices.length > 0) {
-                    centerX /= body.vertices.length;
-                    centerY /= body.vertices.length;
-                    
-                    // Draw the index number
-                    ctx.fillText(`${i}`, centerX, centerY);
-                }
-                
-                // Draw segment name if in debug mode
-                if (i < this.plankSegments.length) {
-                    const segment = this.plankSegments[i];
-                    const name = `${segment.sectionName}_${segment.index}`;
-                    
-                    // Get local coordinates of body center
-                    const centerX = body.position.x - this.position.x;
-                    const centerY = body.position.y - this.position.y;
-                    
-                    // Transform to local coordinates
-                    const localX = centerX * cos - centerY * sin;
-                    const localY = centerX * sin + centerY * cos;
-                    
-                    // Draw label
-                    ctx.font = '8px Arial';
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                    ctx.fillText(name, localX, localY);
-                }
-            }
-            
-            // Add debug information about planks
-            if (BaseGameObject.isDebugMode()) {
-                ctx.font = '12px Arial';
-                ctx.fillStyle = 'yellow';
-                ctx.fillText(`Plank bodies: ${this.plankBodies.length}`, -this.width/2, -this.height/2 - 30);
-                ctx.fillText(`Plank segments: ${this.plankSegments.length}`, -this.width/2, -this.height/2 - 15);
             }
             
             // Restore the original transform
@@ -1586,5 +1558,38 @@ export class Brigantine extends Ships {
         }
         
         ctx.restore();
+    }
+    
+    /**
+     * Remove all constraints connected to plank bodies
+     * @param physics The physics engine instance
+     */
+    private removeAllPlankConstraints(physics: Physics): void {
+        if (!this.body) return;
+        
+        const world = physics.getWorld();
+        const allConstraints = Matter.Composite.allConstraints(world);
+        
+        // Filter constraints connected to this ship's planks
+        const plankConstraints = allConstraints.filter(constraint => {
+            if (!constraint.bodyA || !constraint.bodyB) return false;
+            
+            // Check if either body is the ship's body
+            const isShipBody = constraint.bodyA === this.body || constraint.bodyB === this.body;
+            
+            // Check if either body is a plank body
+            const isPlankBody = this.plankBodies.includes(constraint.bodyA) || 
+                               this.plankBodies.includes(constraint.bodyB);
+            
+            return isShipBody && isPlankBody;
+        });
+        
+        // Remove each constraint
+        if (plankConstraints.length > 0) {
+            console.log(`Removing ${plankConstraints.length} plank constraints`);
+            for (const constraint of plankConstraints) {
+                Matter.World.remove(world, constraint);
+            }
+        }
     }
 }
