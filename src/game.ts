@@ -85,9 +85,15 @@ export class Game {
         
         // Set world generator on renderer
         this.renderer.setWorldGenerator(this.worldGenerator);
-        
-        // Set physics on renderer for debug visualization
+          // Set physics on renderer for debug visualization
         this.renderer.setPhysics(this.physics);
+        
+        // Enable debug mode and physics visualization by default for development
+        BaseGameObject.setDebugMode(true);
+        this.renderer.setShowDebugHUD(true);
+        this.renderer.setShowPhysicsWorld(true);
+        this.showPhysicsWorld = true;
+        console.log("Debug mode and physics visualization enabled by default");
           // Create player and brigantine with some distance between them
         const centerX = this.canvas.getWidth() / 2;
         const centerY = this.canvas.getHeight() / 2;
@@ -444,11 +450,13 @@ export class Game {
                 this.enemies.splice(i, 1);
             }
         }
-    }      private spawnBrigantine(spawnX: number, spawnY: number): Brigantine {
-        // Create a new brigantine enemy ship
+    }      private spawnBrigantine(spawnX: number, spawnY: number): Brigantine {        // Create a new brigantine enemy ship
         const brigantine: Brigantine = new Brigantine(spawnX, spawnY);
         this.physics.addBody(brigantine.getBody()!);
         this.renderer.addGameObject(brigantine);
+        
+        // Set the physics engine on the brigantine so modules can be added to the right world
+        brigantine.setPhysicsEngine(this.physics);
         
         // Set a lower z-index for ships so the player renders on top when boarded
         brigantine.setZIndex(5);

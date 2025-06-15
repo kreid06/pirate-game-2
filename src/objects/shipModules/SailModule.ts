@@ -2,10 +2,14 @@
 import { BaseModule } from './BaseModule';
 import Matter from 'matter-js';
 import { getModuleBodyProperties } from '../../utils/modulePhysics';
+import { CollisionCategories } from '../../utils/color';
 
 export class SailModule extends BaseModule {
     openness: number = 0; // How open the sail is (0-100%)
     angle: number = 0;    // Angle of the sail relative to the mast (-75 to +75 degrees)
+    
+    private mastBody: Matter.Body | null = null;
+    private sailBody: Matter.Body | null = null;
     
     constructor(position: { x: number; y: number }) {
         super('sail', position, 0); // Sails don't have a rotation property in the same way as cannons
@@ -41,7 +45,8 @@ export class SailModule extends BaseModule {
             this.angle = Math.min(0, this.angle + increment);
         }
     }
-      // Calculate sail efficiency based on wind angle (would be called by Ship)
+    
+    // Calculate sail efficiency based on wind angle (would be called by Ship)
     calculateEfficiency(windDirection: number, shipAngle: number): number {
         // Calculate the sail's normal vector (perpendicular to sail face)
         const sailAngleRad = this.angle * Math.PI / 180;
@@ -83,20 +88,25 @@ export class SailModule extends BaseModule {
         
         return efficiency;
     }
-      override update(): void {
+    
+    override update(): void {
         // Update physics body (from parent)
         super.update();
         
         // If the sail position or openness changed, update the physics body
-        if (this.body && this.parentShipBody && this.world) {
+        if (this.parentShipBody && this.world) {
             // Update the physics body size/shape based on openness
-            // In a real implementation, you might replace the body or scale it
-            if (this.openness > 0) {
-                // Only create a body if the sail is at least partly open
-                this.createPhysicsBody(this.parentShipBody, this.world);
-            } else if (this.openness === 0 && this.body) {
-                // Remove the body if the sail is fully closed
-                this.removePhysicsBody();
+            if (this.openness > 0 && !this.sailBody) {
+                // Create sail fiber body if it doesn't exist and sail is open
+                this.createSailFiberBody();
+            } else if (this.openness === 0 && this.sailBody) {
+                // Remove the sail fiber body if the sail is fully closed
+                this.removeSailFiberBody();
+            }
+            
+            // Update the sail fiber body size based on openness if it exists
+            if (this.sailBody && this.openness > 0) {
+                this.updateSailBodySize();
             }
         }
     }
@@ -104,18 +114,19 @@ export class SailModule extends BaseModule {
     override use(): void {
         // Toggle sail state (e.g., start opening/closing)
     }
+    
     /**
-     * Creates a physics body specific to the sail module
+     * Creates physics bodies specific to the sail module: 
+     * - Mast body (circle): DECK_ELEMENT category - player can collide with this
+     * - Sail fiber body (rectangle): SAIL_FIBER category - only projectiles hit this
      * @override
      */
     override createPhysicsBody(shipBody: Matter.Body, world: Matter.World): void {
         // First call parent method to set up common properties
         super.createPhysicsBody(shipBody, world);
         
-        // If a body was already created, remove it
-        if (this.body) {
-            Matter.Composite.remove(world, this.body);
-        }
+        // Remove any existing bodies to prevent duplicates
+        this.removePhysicsBody();
         
         // Get sail-specific body properties
         const bodyProps = getModuleBodyProperties('sail');
@@ -127,12 +138,71 @@ export class SailModule extends BaseModule {
         const worldY = shipBody.position.y + 
             (this.position.x * Math.sin(angle) + this.position.y * Math.cos(angle));
         
-        // Create a sail-specific body - using the openness to adjust the size
+        // Create the mast body - this is a DECK_ELEMENT that the player can collide with
+        this.mastBody = Matter.Bodies.circle(
+            worldX,
+            worldY,
+            15, // Match the visual size in the draw method
+            {
+                isStatic: true,
+                collisionFilter: {
+                    category: CollisionCategories.DECK_ELEMENT,
+                    mask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE,
+                    group: 0
+                },
+                render: {
+                    visible: true,
+                    fillStyle: 'rgba(255, 165, 0, 0.4)', // Orange for deck elements
+                    strokeStyle: 'rgba(255, 165, 0, 0.8)',
+                    lineWidth: 2
+                },
+                label: `mast_base_${this.position.x}_${this.position.y}`
+            }
+        );
+        
+        // Add the mast body to the world
+        if (this.mastBody) {
+            Matter.Composite.add(world, this.mastBody);
+        }
+        
+        // Only create the sail fiber body if openness is > 0
+        if (this.openness > 0) {
+            this.createSailFiberBody();
+        }
+        
+        // Store references
+        this.body = this.mastBody; // Set the main body to the mast
+        this.parentShipBody = shipBody;
+        this.world = world;
+    }
+    
+    /**
+     * Creates a sail fiber body that doesn't collide with the player
+     */
+    private createSailFiberBody(): void {
+        if (!this.parentShipBody || !this.world) return;
+        
+        // Remove existing sail fiber body if it exists
+        this.removeSailFiberBody();
+        
+        // Get sail-specific body properties
+        const bodyProps = getModuleBodyProperties('sail');
+        
+        // Calculate world position
+        const angle = this.parentShipBody.angle;
+        const worldX = this.parentShipBody.position.x + 
+            (this.position.x * Math.cos(angle) - this.position.y * Math.sin(angle));
+        const worldY = this.parentShipBody.position.y + 
+            (this.position.x * Math.sin(angle) + this.position.y * Math.cos(angle));
+        
+        // Calculate sail size based on openness
         const sailWidth = bodyProps.width;
         const sailHeight = bodyProps.height * (this.openness / 100); // Scale height by openness
-          const bodyOptions: Matter.IChamferableBodyDefinition = {
-            label: `module_sail_${this.position.x}_${this.position.y}`,
-            isSensor: true,  // Sails are always sensors (no physical collisions)
+        
+        // Create sail fiber body options
+        const bodyOptions: Matter.IChamferableBodyDefinition = {
+            label: `sail_fiber_${this.position.x}_${this.position.y}`,
+            isSensor: true,  // Sail fibers are always sensors (no physical collisions)
             density: bodyProps.density * (this.openness / 100), // Density affected by openness
             friction: 0.01,
             frictionAir: 0.01,
@@ -142,14 +212,20 @@ export class SailModule extends BaseModule {
             // Prevent the module from moving on its own
             inertia: Infinity,
             collisionFilter: {
-                category: bodyProps.collisionCategory,
-                mask: bodyProps.collisionMask,
-                group: bodyProps.collisionGroup
+                category: CollisionCategories.SAIL_FIBER,
+                mask: CollisionCategories.PROJECTILE, // Only projectiles hit sail fibers
+                group: 0
+            },
+            render: {
+                visible: true,
+                fillStyle: 'rgba(173, 216, 230, 0.4)', // Light blue for sail fibers
+                strokeStyle: 'rgba(173, 216, 230, 0.8)',
+                lineWidth: 2
             }
         };
         
         // Create a rectangle for the sail body
-        this.body = Matter.Bodies.rectangle(
+        this.sailBody = Matter.Bodies.rectangle(
             worldX, 
             worldY, 
             sailWidth, 
@@ -158,20 +234,101 @@ export class SailModule extends BaseModule {
         );
         
         // Apply sail rotation (ship angle + module rotation + sail angle)
-        // Convert sail angle from degrees to radians
         const sailAngleRad = (this.angle * Math.PI) / 180;
-        Matter.Body.setAngle(this.body, angle + this.rotation + sailAngleRad);
-        
-        // Add the body to the world
-        Matter.Composite.add(world, this.body);
-        
-        // Store references
-        this.parentShipBody = shipBody;
-        this.world = world;
+        if (this.sailBody) {
+            Matter.Body.setAngle(this.sailBody, angle + this.rotation + sailAngleRad);
+            
+            // Add the sail body to the world
+            Matter.Composite.add(this.world, this.sailBody);
+        }
     }
+    
+    /**
+     * Removes the sail fiber body if it exists
+     */
+    private removeSailFiberBody(): void {
+        if (this.sailBody && this.world) {
+            Matter.Composite.remove(this.world, this.sailBody);
+            this.sailBody = null;
+        }
+    }
+    
+    /**
+     * Updates the sail body size based on openness
+     */
+    private updateSailBodySize(): void {
+        // This would need to recreate the sail body with the new size
+        // For simplicity, we'll just remove and recreate the sail body
+        if (this.openness > 0) {
+            this.createSailFiberBody();
+        }
+    }
+    
+    /**
+     * Updates the module's position based on the parent ship's position and rotation
+     * @override
+     */
+    override updatePositionFromShip(): void {
+        if (!this.parentShipBody) return;
+        
+        // Get the ship's position and angle
+        const shipPos = this.parentShipBody.position;
+        const shipAngle = this.parentShipBody.angle;
+        
+        // Calculate the module's world position based on its offset from the ship's center
+        // and the ship's rotation
+        const offsetX = this.position.x * Math.cos(shipAngle) - this.position.y * Math.sin(shipAngle);
+        const offsetY = this.position.x * Math.sin(shipAngle) + this.position.y * Math.cos(shipAngle);
+        
+        // Update the mast body position
+        if (this.mastBody) {
+            Matter.Body.setPosition(this.mastBody, {
+                x: shipPos.x + offsetX,
+                y: shipPos.y + offsetY
+            });
+            
+            // Update the mast body angle
+            Matter.Body.setAngle(this.mastBody, shipAngle + this.rotation);
+        }
+        
+        // Update the sail body position and angle if it exists
+        if (this.sailBody) {
+            Matter.Body.setPosition(this.sailBody, {
+                x: shipPos.x + offsetX,
+                y: shipPos.y + offsetY
+            });
+            
+            // Apply sail rotation (ship angle + module rotation + sail angle)
+            const sailAngleRad = (this.angle * Math.PI) / 180;
+            Matter.Body.setAngle(this.sailBody, shipAngle + this.rotation + sailAngleRad);
+        }
+    }
+    
+    /**
+     * Remove the physics bodies for this module
+     * @override
+     */
+    override removePhysicsBody(): void {
+        if (this.mastBody && this.world) {
+            Matter.Composite.remove(this.world, this.mastBody);
+            this.mastBody = null;
+        }
+        
+        if (this.sailBody && this.world) {
+            Matter.Composite.remove(this.world, this.sailBody);
+            this.sailBody = null;
+        }
+        
+        this.body = null;
+    }
+    
+    /**
+     * Draw the sail at its position
+     */
     draw(ctx: CanvasRenderingContext2D): void {
         ctx.save();
         ctx.translate(this.position.x, this.position.y);
+        
         // Draw mast
         ctx.beginPath();
         ctx.arc(0, 0, 15, 0, Math.PI * 2);
@@ -180,13 +337,16 @@ export class SailModule extends BaseModule {
         ctx.lineWidth = 4;
         ctx.fill();
         ctx.stroke();
+        
         // Draw sail only if open
         if (this.openness > 0) {
             ctx.save();
             ctx.rotate(this.angle * Math.PI / 180);
+            
+            // Draw the sail as a curved shape
             ctx.beginPath();
             ctx.moveTo(0, 130);
-            const curveAmount = 10 + this.openness * 0.9;
+            const curveAmount = 10 + this.openness * 0.9; // Curve amount based on openness
             ctx.quadraticCurveTo(curveAmount, 0, 0, -130);
             ctx.closePath();
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
@@ -196,6 +356,7 @@ export class SailModule extends BaseModule {
             ctx.stroke();
             ctx.restore();
         }
+        
         ctx.restore();
     }
 }

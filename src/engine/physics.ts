@@ -314,8 +314,48 @@ export class Physics {
      * Draw a single physics body for debugging
      * @param ctx The canvas rendering context
      * @param body The physics body to draw
-     */
-    private drawBody(ctx: CanvasRenderingContext2D, body: Matter.Body): void {
+     */    private drawBody(ctx: CanvasRenderingContext2D, body: Matter.Body): void {
+        // Set fill color based on body type with higher opacity for better visibility
+        if (body.isSensor) {
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.4)'; // Yellow for sensors
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+        } else if (body.isStatic) {
+            ctx.fillStyle = 'rgba(128, 128, 128, 0.4)'; // Gray for static bodies
+            ctx.strokeStyle = 'rgba(200, 200, 200, 0.8)';
+        } else {
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.4)'; // Green for dynamic bodies
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+        }
+        
+        // Check for collision category-specific colors
+        if (body.collisionFilter && body.collisionFilter.category) {
+            switch (body.collisionFilter.category) {
+                case 0x0001: // PLAYER
+                    ctx.fillStyle = 'rgba(255, 0, 255, 0.4)'; // Magenta for player
+                    ctx.strokeStyle = 'rgba(255, 0, 255, 0.8)';
+                    break;
+                case 0x0002: // SHIP
+                    ctx.fillStyle = 'rgba(165, 42, 42, 0.4)'; // Brown for ship
+                    ctx.strokeStyle = 'rgba(165, 42, 42, 0.8)';
+                    break;
+                case 0x0080: // DECK_ELEMENT
+                    ctx.fillStyle = 'rgba(255, 165, 0, 0.4)'; // Orange for deck elements
+                    ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)';
+                    break;
+                case 0x0100: // MODULE
+                    ctx.fillStyle = 'rgba(0, 0, 255, 0.4)'; // Blue for modules
+                    ctx.strokeStyle = 'rgba(0, 0, 255, 0.8)';
+                    break;
+                case 0x0200: // SAIL_FIBER
+                    ctx.fillStyle = 'rgba(173, 216, 230, 0.4)'; // Light blue for sail fibers
+                    ctx.strokeStyle = 'rgba(173, 216, 230, 0.8)';
+                    break;
+            }
+        }
+        
+        // Set line width for better visibility
+        ctx.lineWidth = 2;
+
         if (body.parts.length === 1) {
             // Draw a simple body
             const part = body.parts[0];
@@ -358,6 +398,23 @@ export class Physics {
         ctx.arc(body.position.x, body.position.y, 3, 0, 2 * Math.PI);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.fill();
+        
+        // Draw body label if it exists
+        if (body.label && body.label !== 'Body') {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(body.label, body.position.x, body.position.y - 15);
+        }
+        
+        // Draw collision category if it exists
+        if (body.collisionFilter && body.collisionFilter.category) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.font = '8px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`0x${body.collisionFilter.category.toString(16).padStart(4, '0')}`, 
+                         body.position.x, body.position.y + 15);
+        }
     }
     
     /**
@@ -469,34 +526,73 @@ export class Physics {
         ctx.fillText(`Total Physics Bodies: ${totalBodies}`, 20, 40);
         ctx.fillText(`Static Bodies: ${staticCount}`, 20, 60);
         ctx.fillText(`Dynamic Bodies: ${dynamicCount}`, 20, 80);
-        ctx.fillText(`Sensor Bodies: ${sensorCount}`, 20, 100);
-        ctx.fillText(`Collision Points: ${this.collisionPoints.length}`, 20, 120);
+        ctx.fillText(`Sensor Bodies: ${sensorCount}`, 20, 100);        ctx.fillText(`Collision Points: ${this.collisionPoints.length}`, 20, 120);
         
-        // Color legend with larger color boxes
+        // Update color legend with collision categories
         const legendX = 160;
         const boxSize = 12;
         
         // Static bodies color
-        ctx.fillStyle = Color.DEBUG_STATIC;
-        ctx.fillRect(legendX, 60, boxSize, boxSize);
+        ctx.fillStyle = 'rgba(128, 128, 128, 0.4)'; // Gray for static bodies
+        ctx.fillRect(legendX, 40, boxSize, boxSize);
         ctx.strokeStyle = 'white';
         ctx.lineWidth = 0.5;
-        ctx.strokeRect(legendX, 60, boxSize, boxSize);
+        ctx.strokeRect(legendX, 40, boxSize, boxSize);
         
         // Dynamic bodies color
-        ctx.fillStyle = Color.DEBUG_DYNAMIC;
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.4)'; // Green for dynamic bodies
+        ctx.fillRect(legendX, 60, boxSize, boxSize);
+        ctx.strokeRect(legendX, 60, boxSize, boxSize);
+        
+        // Sensor bodies color
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.4)'; // Yellow for sensors
         ctx.fillRect(legendX, 80, boxSize, boxSize);
         ctx.strokeRect(legendX, 80, boxSize, boxSize);
         
-        // Sensor bodies color
-        ctx.fillStyle = Color.DEBUG_SENSOR_BODY;
+        // Player category
+        ctx.fillStyle = 'rgba(255, 0, 255, 0.4)'; // Magenta for player
         ctx.fillRect(legendX, 100, boxSize, boxSize);
         ctx.strokeRect(legendX, 100, boxSize, boxSize);
         
-        // Collision points color
-        ctx.fillStyle = Color.DEBUG_COLLISION;
+        // Ship category
+        ctx.fillStyle = 'rgba(165, 42, 42, 0.4)'; // Brown for ship
         ctx.fillRect(legendX, 120, boxSize, boxSize);
         ctx.strokeRect(legendX, 120, boxSize, boxSize);
+        
+        // Deck element category
+        ctx.fillStyle = 'rgba(255, 165, 0, 0.4)'; // Orange for deck elements
+        ctx.fillRect(legendX, 140, boxSize, boxSize);
+        ctx.strokeRect(legendX, 140, boxSize, boxSize);
+        
+        // Module category
+        ctx.fillStyle = 'rgba(0, 0, 255, 0.4)'; // Blue for modules
+        ctx.fillRect(legendX + 60, 40, boxSize, boxSize);
+        ctx.strokeRect(legendX + 60, 40, boxSize, boxSize);
+        
+        // Sail fiber category
+        ctx.fillStyle = 'rgba(173, 216, 230, 0.4)'; // Light blue for sail fibers
+        ctx.fillRect(legendX + 60, 60, boxSize, boxSize);
+        ctx.strokeRect(legendX + 60, 60, boxSize, boxSize);
+        
+        // Collision points color
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+        ctx.fillRect(legendX + 60, 80, boxSize, boxSize);
+        ctx.strokeRect(legendX + 60, 80, boxSize, boxSize);
+        
+        // Add labels
+        ctx.fillStyle = 'white';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('Static', legendX + boxSize + 5, 50);
+        ctx.fillText('Dynamic', legendX + boxSize + 5, 70);
+        ctx.fillText('Sensor', legendX + boxSize + 5, 90);
+        ctx.fillText('Player', legendX + boxSize + 5, 110);
+        ctx.fillText('Ship', legendX + boxSize + 5, 130);
+        ctx.fillText('Deck', legendX + boxSize + 5, 150);
+        
+        ctx.fillText('Module', legendX + boxSize + 65, 50);
+        ctx.fillText('Sail Fiber', legendX + boxSize + 65, 70);
+        ctx.fillText('Collision', legendX + boxSize + 65, 90);
         
         ctx.fillStyle = 'white';
         ctx.font = '11px Arial';

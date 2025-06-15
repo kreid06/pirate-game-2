@@ -12,15 +12,17 @@ export class Brigantine extends Ships {
     private sailSize: number;
     path: Path2D | null = null;
     // Add boarding ladder properties
-    private ladderRect: { x: number, y: number, width: number, height: number };
-    private playerInLadderArea: boolean = false;
+    private ladderRect: { x: number, y: number, width: number, height: number };    private playerInLadderArea: boolean = false;
     private playerIsHovering: boolean = false;    
     private playerIsBoarded: boolean = false;
     
     // Ship modules collections
-    modules: Map<string, BaseModule> = new Map();
-    sails: Map<string, SailModule> = new Map();
-    wheels: Map<string, WheelModule> = new Map();
+    public modules: Map<string, BaseModule> = new Map();
+    public sails: Map<string, SailModule> = new Map();
+    public wheels: Map<string, WheelModule> = new Map();
+    
+    // Reference to the physics engine
+    private physicsEngine: Physics | null = null;
     
     // Ship sailing properties
     rudderAngle: number = 0;       // Current rudder angle (-30 to +30 degrees)
@@ -50,8 +52,7 @@ export class Brigantine extends Ships {
         
         // Initialize ladder rectangle (will be positioned correctly in update)
         this.ladderRect = { x: 0, y: 0, width: 60, height: 30 };
-        
-        // Initialize ship modules based on mast positions
+          // Initialize ship modules based on mast positions
         const mainSail = new SailModule({ x: 0, y: 0 }); // Main mast (center)
         const foreSail = new SailModule({ x: 100, y: 0 }); // Fore mast (front)
         const wheel = new WheelModule({ x: -90, y: 0 }); // Steering wheel (back)
@@ -78,13 +79,19 @@ export class Brigantine extends Ships {
         } else if (module instanceof WheelModule) {
             this.wheels.set(id, module);
         }
-        
-        // Attach the module to the ship
+          // Attach the module to the ship
         module.attachToShip(this);
-        
-        // Create physics body for the module if the ship has a body
+          // Create physics body for the module if the ship has a body
         if (this.body && module.createPhysicsBody) {
-            module.createPhysicsBody(this.body, Matter.World.create({}));
+            // Use the real physics world if available
+            if (this.physicsEngine) {
+                module.createPhysicsBody(this.body, this.physicsEngine.getWorld());
+                console.log(`Created physics body for module ${id} of type ${module.type} in game physics world`);
+            } else {
+                // Fallback to a temporary world if no physics engine is set yet
+                module.createPhysicsBody(this.body, Matter.World.create({}));
+                console.log(`Created physics body for module ${id} of type ${module.type} in temporary world`);
+            }
         }
         
         return true;
@@ -126,8 +133,7 @@ export class Brigantine extends Ships {
         
         // If a player body is provided, update its collision filtering
         if (playerBody) {
-            if (boarded) {
-                // When boarded, player should collide with deck elements and modules but not the ship hull or sail fibers
+            if (boarded) {                // When boarded, player should collide with deck elements and modules but not the ship hull or sail fibers
                 playerBody.collisionFilter = {
                     category: CollisionCategories.PLAYER,
                     mask: CollisionCategories.DECK_ELEMENT | CollisionCategories.MODULE | 
@@ -135,10 +141,12 @@ export class Brigantine extends Ships {
                           CollisionCategories.TREASURE,
                     group: 0
                 };
-                
-                // Log that player is now set to collide with deck elements and modules
+                  // Log that player is now set to collide with deck elements and modules
                 console.log("Player boarded ship - Now collides with deck elements and modules");
-            } else {
+                console.log(`Collision mask set to: ${playerBody.collisionFilter?.mask?.toString(16) || 'undefined'}`);
+                console.log(`MODULE category: ${CollisionCategories.MODULE.toString(16)}`);
+                console.log(`DECK_ELEMENT category: ${CollisionCategories.DECK_ELEMENT.toString(16)}`);
+                } else {
                 // When not boarded, restore normal collision filtering
                 playerBody.collisionFilter = {
                     category: CollisionCategories.PLAYER,
@@ -308,78 +316,18 @@ export class Brigantine extends Ships {
             }
         }
         
-        console.log(`Created ${this.plankBodies.length} plank bodies for brigantine`);
-    }
+        console.log(`Created ${this.plankBodies.length} plank bodies for brigantine`);    }
     
     /**
      * Create physics bodies for the masts
+     * Note: This is now only used for masts that don't have a SailModule
+     * SailModule creates its own physics bodies
      * @param physics Physics engine instance
      */
     public createMastBodies(physics: Physics): void {
-        console.log("Creating mast bodies for brigantine...");
-        
-        // Create physics bodies for each mast
-        for (const mast of Brigantine.MASTS) {
-            try {
-                // Calculate world position based on ship position and rotation
-                const cosRot = Math.cos(this.rotation);
-                const sinRot = Math.sin(this.rotation);
-                const worldX = this.position.x + mast.x * cosRot - mast.y * sinRot;
-                const worldY = this.position.y + mast.x * sinRot + mast.y * cosRot;
-                
-                // Create a circular body for the mast base
-                const mastBaseBody = Matter.Bodies.circle(
-                    worldX,
-                    worldY,
-                    mast.r,
-                    {
-                        isStatic: true, // Masts are static
-                        collisionFilter: {
-                            category: CollisionCategories.DECK_ELEMENT,
-                            mask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE,
-                            group: 0
-                        },
-                        render: {
-                            visible: false // We'll render these manually
-                        },
-                        label: `brigantine_mast_base_${mast.x}_${mast.y}`
-                    }
-                );
-                
-                // Create a rectangle body for the mast post
-                const mastWidth = mast.r * 0.8;
-                const mastHeight = mast.r * 12; // Same height as visual representation
-                
-                const mastPostBody = Matter.Bodies.rectangle(
-                    worldX,
-                    worldY - mastHeight / 2, // Position up from the base
-                    mastWidth,
-                    mastHeight,
-                    {
-                        isStatic: true, // Masts are static
-                        collisionFilter: {
-                            category: CollisionCategories.DECK_ELEMENT,
-                            mask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE,
-                            group: 0
-                        },
-                        render: {
-                            visible: false // We'll render these manually
-                        },
-                        label: `brigantine_mast_post_${mast.x}_${mast.y}`
-                    }
-                );
-                
-                // Add the bodies to the world
-                Matter.World.add(physics.getWorld(), [mastBaseBody, mastPostBody]);
-                
-                // Store the bodies for future reference
-                this.plankBodies.push(mastBaseBody, mastPostBody); // Store with plank bodies for simplicity
-                
-                console.log(`Created mast bodies at position ${mast.x}, ${mast.y}`);
-            } catch (error) {
-                console.error(`Error creating mast body: ${error}`);
-            }
-        }
+        console.log("Skipping direct mast body creation as SailModule handles this now");
+        // The ship modules (SailModule) now handle their own physics bodies
+        // This method is kept for backward compatibility and future non-module masts
     }
     
     /**
@@ -815,13 +763,12 @@ export class Brigantine extends Ships {
     /**
      * Define the wheel position and shape
      */
-    private static readonly WHEEL = { x: -90, y: 0, w: 20, h: 40 };
-    
-    /**
+    private static readonly WHEEL = { x: -90, y: 0, w: 20, h: 40 };    /**
      * Draw the ship's masts
+     * Note: This only draws mast bases. The SailModule handles drawing the mast posts and sails.
      */
     private drawMasts(ctx: CanvasRenderingContext2D): void {
-        // Draw mast bases - the sails themselves are drawn by the SailModule
+        // Draw mast bases only - the SailModule handles drawing the mast posts and sails
         for (const mast of Brigantine.MASTS) {
             // Draw mast base
             ctx.fillStyle = '#8B4513'; // Brown
@@ -832,10 +779,7 @@ export class Brigantine extends Ships {
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // Draw mast post
-            const mastWidth = mast.r * 0.8;
-            const mastHeight = mast.r * 12; // Taller masts
-            ctx.fillRect(mast.x - mastWidth/2, mast.y - mastHeight/2, mastWidth, mastHeight);
+            // No longer draw mast posts here - the SailModule handles that
         }
     }
     
@@ -1285,6 +1229,25 @@ export class Brigantine extends Ships {
     }
     
     /**
+     * Set the physics engine to use for module bodies
+     * @param physics The physics engine instance
+     */
+    public setPhysicsEngine(physics: Physics): void {        this.physicsEngine = physics;
+        
+        // Recreate module physics bodies if they already exist
+        this.modules.forEach((module: BaseModule) => {
+            if (this.body && module.createPhysicsBody) {
+                // Remove old body first
+                module.removePhysicsBody();
+                
+                // Create new body in the right world
+                module.createPhysicsBody(this.body, physics.getWorld());
+                console.log(`Recreated physics body for module ${module.type}`);
+            }
+        });
+    }
+    
+    /**
      * Draw the ship
      */
     public render(ctx: CanvasRenderingContext2D): void {
@@ -1311,9 +1274,8 @@ export class Brigantine extends Ships {
         // Draw the boarding ladder
         this.drawBoardingLadder(ctx);        // Draw the masts
         this.drawMasts(ctx);
-        
-        // Draw ship modules
-        this.modules.forEach(module => {
+          // Draw ship modules
+        this.modules.forEach((module: BaseModule) => {
             if (module instanceof SailModule) {
                 module.draw(ctx);
             } else if (module instanceof WheelModule) {

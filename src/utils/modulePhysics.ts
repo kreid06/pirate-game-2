@@ -51,17 +51,14 @@ export function getModuleBodyProperties(moduleType: string): ModuleBodyPropertie
                 collisionCategory: CollisionCategories.SAIL_FIBER, // Use the new sail fiber category
                 collisionMask: CollisionCategories.PROJECTILE // Only hit by projectiles
             };
-        
-        case 'wheel':
+          case 'wheel':
             return {
-                ...defaultProps,
-                width: 30,
-                height: 30,
-                radius: 15, // Wheels are circular
-                density: 0.002,
-                isSensor: true, // The wheel is just for control, no physics interactions
+                ...defaultProps,                width: 40,
+                height: 40,
+                radius: 20, // Increased wheel size for better collision
+                density: 0.002,isSensor: false, // Changed to false so it physically collides with the player
                 collisionCategory: CollisionCategories.MODULE, // Use the new module category
-                collisionMask: CollisionCategories.PLAYER // Only collide with player for interaction
+                collisionMask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE // Collide with player and projectiles
             };
         
         default:
