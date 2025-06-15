@@ -207,9 +207,21 @@ export class Game {
         this.islandGenerator.update();
         
         // Update enemy spawn timer and spawn new enemies
-        this.updateEnemies(delta);        // Update all ships to sync their visual coordinates with physics bodies
+        this.updateEnemies(delta);
+        
+        // Update all ships to sync their visual coordinates with physics bodies
         for (const ship of this.ships) {
             ship.update(delta);
+            
+            // If the player is on this ship and it's a Brigantine, update player physics
+            if (this.player.isOnBoard() && 
+                this.player.getBoardedShip() === ship && 
+                ship instanceof Brigantine && 
+                this.player.getBody()) {
+                
+                // Update the player's physics based on the ship's movement
+                ship.updateBoardedPlayer(this.player.getBody()!, delta);
+            }
         }
         
         // Update ships' ladder highlight states based on player proximity and mouse position

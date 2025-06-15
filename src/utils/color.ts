@@ -79,5 +79,6 @@ export const CollisionCategories = {
     POWERUP: 0x0010,
     TREASURE: 0x0020,
     ISLAND: 0x0040,
+    DECK_ELEMENT: 0x0080, // New category for masts, planks, etc. on deck
     ALL: 0xFFFFFFFF
 };

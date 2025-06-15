@@ -206,54 +206,62 @@ export class Player extends BaseGameObject {
             console.log(`❌ BOARDING FAILED: ${this.isBoarded ? 'Player is already on a ship' : 'Player body not initialized'}`);
             return;
         }
-        
-        // Store reference to boarded ship
+          // Store reference to boarded ship
         this.boardedShip = ship;
         this.isBoarded = true;
         
-        // Update ship's boarding state
-        ship.setPlayerBoarded(true);
-          // Update collision filter to ignore collisions with ships while boarded
-        const currentFilter = this.body.collisionFilter;
-        const newMask = (currentFilter.mask !== undefined) 
-            ? currentFilter.mask & ~CollisionCategories.SHIP 
-            : ~CollisionCategories.SHIP;
-          // Set new collision filter
-        this.body.collisionFilter = {
-            category: currentFilter.category,
-            mask: newMask,
-            group: currentFilter.group
-        };
+        // Teleport player to the center of the ship
+        const shipPosition = ship.getPosition();
+        const shipRotation = ship.getRotation();
+        
+        // Calculate a position on the deck (slightly aft of center for a brigantine)
+        const deckOffsetX = -20; // Slightly aft of center
+        const deckOffsetY = 0;   // Centered horizontally
+        
+        // Calculate the world position using the ship's rotation
+        const cos = Math.cos(shipRotation);
+        const sin = Math.sin(shipRotation);
+        const worldX = shipPosition.x + deckOffsetX * cos - deckOffsetY * sin;
+        const worldY = shipPosition.y + deckOffsetX * sin + deckOffsetY * cos;
+        
+        // Teleport the player to the deck position
+        if (this.body) {
+            Matter.Body.setPosition(this.body, { x: worldX, y: worldY });
+            Matter.Body.setVelocity(this.body, { x: 0, y: 0 }); // Reset velocity
+            Matter.Body.setAngularVelocity(this.body, 0); // Reset angular velocity
+            
+            // Update player's position to match the physics body
+            this.position.x = worldX;
+            this.position.y = worldY;
+            
+            console.log(`Player teleported to ship deck: (${worldX.toFixed(2)}, ${worldY.toFixed(2)})`);
+        }
+        
+        // Update ship's boarding state and collision filters
+        if (this.body) {
+            ship.setPlayerBoarded(true, this.body);
+        } else {
+            ship.setPlayerBoarded(true);
+        }
         
         console.log(`✅ BOARDING SUCCESSFUL: Player is now onboard ship`);
-    }    /**
+    }/**
      * Unboard a ship - restores normal collision filtering
      */
     public unboardShip(): void {
         if (!this.body || !this.isBoarded || !this.boardedShip) {
             console.log(`❌ UNBOARDING FAILED: ${!this.isBoarded ? 'Player is not on a ship' : 'Missing references'}`);
             return;
+        }        // Update ship's boarding state and collision filters
+        if (this.body) {
+            this.boardedShip.setPlayerBoarded(false, this.body);
+        } else {
+            this.boardedShip.setPlayerBoarded(false);
         }
-        
-        // Update ship's boarding state
-        this.boardedShip.setPlayerBoarded(false);
         
         // Reset boarding state
         this.boardedShip = null;
         this.isBoarded = false;
-          // Restore normal collision filtering
-        const currentFilter = this.body.collisionFilter;
-        const newMask = (currentFilter.mask !== undefined)
-            ? currentFilter.mask | CollisionCategories.SHIP
-            : CollisionCategories.SHIP | CollisionCategories.ENEMY | CollisionCategories.POWERUP | 
-              CollisionCategories.TREASURE | CollisionCategories.ISLAND;
-              
-        // Set new collision filter        
-        this.body.collisionFilter = {
-            category: currentFilter.category,
-            mask: newMask,
-            group: currentFilter.group
-        };
         
         console.log(`✅ UNBOARDING SUCCESSFUL: Player has disembarked from the ship`);
     }
