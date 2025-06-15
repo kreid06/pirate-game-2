@@ -16,6 +16,7 @@ import { EffectManager } from './objects/effects/effectManager';
 import { WaterSplash } from './objects/effects/waterSplash';
 import { Explosion } from './objects/effects/explosion';
 import { Cannons } from './objects/shipModules/cannons';
+import { WheelModule } from './objects/shipModules/WheelModule';
 import * as Matter from 'matter-js';
 import { Brigantine } from './objects/ships/brigantine';
 import { Ships } from './objects/ships/ships';
@@ -202,6 +203,9 @@ export class Game {
         
         // Update player
         this.player.update(delta);
+        
+        // Handle ship controls if player is controlling a wheel
+        this.handleShipControls();
         
         // Update module hover interaction
         this.updateModuleHoverInteraction();
@@ -1052,8 +1056,7 @@ export class Game {
             boardedShip.renderBoardedUI(ctx);
         }
     }
-    
-    /**
+      /**
      * Handles interaction when the 'E' key is pressed
      * This is called directly by the Input system
      */    private handleInteraction(): void {
@@ -1070,11 +1073,40 @@ export class Game {
                     this.input.getMousePosition().y
                 );
                 
+                // Check if player is interacting with a module (wheel)
+                const hoveredModule = boardedShip.getModuleAtPoint(mouseWorldPos.x, mouseWorldPos.y);
+                if (hoveredModule && hoveredModule instanceof WheelModule) {
+                    // Toggle wheel control
+                    if (hoveredModule.isPlayerControlling) {
+                        // Release control of the wheel
+                        hoveredModule.setPlayerControlling(false);
+                        console.log('🔑 INTERACT: Player released control of the wheel');
+                    } else {
+                        // Take control of the wheel                        // First, release control of any other wheels
+                        for (const [_, wheel] of boardedShip.wheels.entries()) {
+                            if (wheel.isPlayerControlling) {
+                                wheel.setPlayerControlling(false);
+                            }
+                        }
+                        
+                        // Now take control of this wheel
+                        hoveredModule.setPlayerControlling(true);
+                        console.log('🔑 INTERACT: Player took control of the wheel');
+                    }
+                    return;
+                }
+                
                 // Only allow deboarding if player is at the ladder
                 const inLadderArea = boardedShip.isPointInLadderArea(playerPos.x, playerPos.y, 70);
                 const isHovering = boardedShip.isPointHoveringLadder(mouseWorldPos.x, mouseWorldPos.y);
                 
-                if (inLadderArea && isHovering) {
+                if (inLadderArea && isHovering) {                    // Release control of any wheels before disembarking
+                    for (const [_, wheel] of boardedShip.wheels.entries()) {
+                        if (wheel.isPlayerControlling) {
+                            wheel.setPlayerControlling(false);
+                        }
+                    }
+                    
                     console.log('🔑 INTERACT: Player is disembarking from ship at the ladder');
                     this.player.unboardShip();
                 } else {
@@ -1152,10 +1184,13 @@ export class Game {
           // If the player is boarded on a ship, check for module hover on that ship
         if (this.player.isOnBoard()) {
             const boardedShip = this.player.getBoardedShip();
-            if (boardedShip && boardedShip instanceof Brigantine) {
-                // Reset hover state on all modules
-                boardedShip.sails.forEach(sail => sail.setHovered(false));
-                boardedShip.wheels.forEach(wheel => wheel.setHovered(false));
+            if (boardedShip && boardedShip instanceof Brigantine) {                // Reset hover state on all modules
+                for (const [_, sail] of boardedShip.sails.entries()) {
+                    sail.setHovered(false);
+                }
+                for (const [_, wheel] of boardedShip.wheels.entries()) {
+                    wheel.setHovered(false);
+                }
                 
                 // Add debug info periodically
                 if (Math.random() < 0.01) { // Only log occasionally
@@ -1209,20 +1244,116 @@ export class Game {
                     hoveredModule.renderTooltip(ctx);
                     return; // Only show one tooltip at a time
                 }
-                
-                // Fallback to iterating through each module type if needed
-                boardedShip.sails.forEach(sail => {
+                  // Fallback to iterating through each module type if needed
+                for (const [_, sail] of boardedShip.sails.entries()) {
                     if (sail.getIsHovered()) {
                         sail.renderTooltip(ctx);
                     }
-                });
+                }
                 
-                boardedShip.wheels.forEach(wheel => {
+                for (const [_, wheel] of boardedShip.wheels.entries()) {
                     if (wheel.getIsHovered()) {
                         wheel.renderTooltip(ctx);
                     }
-                });
+                }
             }
         }
+    }
+    
+    /**
+     * Handle ship controls when player is at the wheel
+     */
+    private handleShipControls(): void {
+        // Check if player is on board a ship
+        if (!this.player.isOnBoard()) return;
+        
+        const boardedShip = this.player.getBoardedShip();
+        if (!(boardedShip instanceof Brigantine)) return;        // Check if player is controlling any wheel
+        let controllingWheel: WheelModule | null = null;
+        for (const [_, wheel] of boardedShip.wheels.entries()) {
+            if (wheel.isPlayerControlling) {
+                controllingWheel = wheel;
+                break;
+            }
+        }
+        
+        // If player is not controlling any wheel, return
+        if (!controllingWheel) return;
+        
+        // Track the keys that were handled
+        const handledKeys = new Set<string>();
+        
+        // WASD controls for ship steering:
+        // W/S - Control sail openness
+        // A/D - Control rudder (turning)
+        // Shift+A/D - Rotate sails
+        
+        // Sail openness controls (W/S)
+        if (this.input.isKeyDown('w') && !this.input.isKeyDown('s')) {
+            // Open sails with W
+            boardedShip.openSails();
+            // Add to handled keys
+            handledKeys.add('w');
+        } 
+        else if (this.input.isKeyDown('s') && !this.input.isKeyDown('w')) {
+            // Close sails with S
+            boardedShip.closeSails();
+            // Add to handled keys
+            handledKeys.add('s');
+        }
+        
+        // Rudder controls (A/D)
+        if (this.input.isKeyDown('a') && !this.input.isKeyDown('d') && !this.input.isKeyDown('shift')) {
+            // Turn left with A
+            boardedShip.applyRudder('left');
+            // Update wheel visual angle
+            controllingWheel.turnLeft();
+            // Add to handled keys
+            handledKeys.add('a');
+        } 
+        else if (this.input.isKeyDown('d') && !this.input.isKeyDown('a') && !this.input.isKeyDown('shift')) {
+            // Turn right with D
+            boardedShip.applyRudder('right');
+            // Update wheel visual angle
+            controllingWheel.turnRight();
+            // Add to handled keys
+            handledKeys.add('d');
+        }
+        else if (!this.input.isKeyDown('a') && !this.input.isKeyDown('d') && !this.input.isKeyDown('shift')) {
+            // Return rudder to center position when no keys are pressed
+            boardedShip.applyRudder('center');
+            // Center wheel visual angle
+            controllingWheel.centerWheel();
+        }
+        
+        // Sail rotation controls (Shift+A/D)
+        if (this.input.isKeyDown('shift')) {
+            handledKeys.add('shift');
+            
+            if (this.input.isKeyDown('a') && !this.input.isKeyDown('d')) {
+                // Rotate sails left with Shift+A
+                boardedShip.rotateSails('left');
+                // Add to handled keys
+                handledKeys.add('a');
+            } 
+            else if (this.input.isKeyDown('d') && !this.input.isKeyDown('a')) {
+                // Rotate sails right with Shift+D
+                boardedShip.rotateSails('right');
+                // Add to handled keys
+                handledKeys.add('d');
+            }
+            else {
+                // If no A/D pressed with Shift, center sails
+                boardedShip.rotateSails('center');
+            }
+        }
+        
+        // Clear handled keys from input to prevent double handling
+        handledKeys.forEach(key => {
+            // Only clear W/S after handling to prevent continuous adjustment
+            if (key === 'w' || key === 's') {
+                this.input.clearKey(key);
+            }
+        });
     }
 }

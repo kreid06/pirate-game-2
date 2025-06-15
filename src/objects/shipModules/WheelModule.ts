@@ -20,9 +20,8 @@ export class WheelModule extends BaseModule {
         this.effectiveness = 1.0;
         this.useInstruction = "Press E to take control";
     }
-    
-    // Set the wheel angle
-    setWheelAngle(degrees: number): void {
+      // Set the wheel angle
+    public setWheelAngle(degrees: number): void {
         // Limit the wheel angle to -30 to +30 degrees
         this.wheelAngle = Math.max(-30, Math.min(30, degrees));
         
@@ -31,17 +30,17 @@ export class WheelModule extends BaseModule {
     }
     
     // Turn the wheel left by an increment
-    turnLeft(increment: number = 0.5): void {
+    public turnLeft(increment: number = 0.5): void {
         this.setWheelAngle(this.wheelAngle - increment);
     }
     
     // Turn the wheel right by an increment
-    turnRight(increment: number = 0.5): void {
+    public turnRight(increment: number = 0.5): void {
         this.setWheelAngle(this.wheelAngle + increment);
     }
     
     // Center the wheel (move towards 0 degrees)
-    centerWheel(increment: number = 0.5): void {
+    public centerWheel(increment: number = 0.5): void {
         if (this.wheelAngle > 0) {
             this.wheelAngle = Math.max(0, this.wheelAngle - increment);
         } else if (this.wheelAngle < 0) {
@@ -53,7 +52,7 @@ export class WheelModule extends BaseModule {
     }
     
     // Set player controlling state
-    setPlayerControlling(isControlling: boolean): void {
+    public setPlayerControlling(isControlling: boolean): void {
         this.isPlayerControlling = isControlling;
         if (isControlling) {
             this.useInstruction = "Press E to release control";
