@@ -1,8 +1,8 @@
 // SailModule.ts - Specialized class for ship sails
-import { BaseModule } from './BaseModule';
+import { BaseModule, ModuleTooltipInfo } from './BaseModule';
 import Matter from 'matter-js';
 import { getModuleBodyProperties } from '../../utils/modulePhysics';
-import { CollisionCategories } from '../../utils/color';
+import { CollisionCategories, Color } from '../../utils/color';
 
 export class SailModule extends BaseModule {
     openness: number = 0; // How open the sail is (0-100%)
@@ -128,6 +128,20 @@ export class SailModule extends BaseModule {
     
     override use(): void {
         // Toggle sail state (e.g., start opening/closing)
+    }
+    
+    // Override getTooltipInfo to include sail-specific information
+    override getTooltipInfo(): ModuleTooltipInfo {
+        const info = super.getTooltipInfo();
+        const sailAngleText = this.angle === 0 ? "Centered" : 
+                              this.angle > 0 ? `${Math.abs(this.angle)}° Starboard` : 
+                                              `${Math.abs(this.angle)}° Port`;
+        
+        return {
+            ...info,
+            description: `${info.description}\nOpenness: ${Math.round(this.openness)}%\nAngle: ${sailAngleText}`,
+            effectiveness: this.effectiveness
+        };
     }
     
     /**
@@ -333,19 +347,37 @@ export class SailModule extends BaseModule {
         }
         
         this.body = null;
-    }
-    
-    /**
+    }    /**
      * Draw the sail at its position
      */
     draw(ctx: CanvasRenderingContext2D): void {
         ctx.save();
-        ctx.translate(this.position.x, this.position.y);        // Draw mast
+        ctx.translate(this.position.x, this.position.y);        
+        
+        // Create gradients for mast base
+        const mastRadius = 15;
+        const mastGradient = ctx.createRadialGradient(
+            0, 0, 0,
+            0, 0, mastRadius
+        );
+        
+        if (this.isHovered) {
+            // Highlight gradient for mast when hovered
+            mastGradient.addColorStop(0, '#D2B48C'); // Regular tan color at center
+            mastGradient.addColorStop(0.7, '#CD853F'); // Peru (lighter brown)
+            mastGradient.addColorStop(1, '#FFD700'); // Gold tint at the edge for highlight
+        } else {
+            // Normal gradient for mast
+            mastGradient.addColorStop(0, '#D2B48C'); // Regular tan color
+            mastGradient.addColorStop(1, '#8B4513'); // Darker at edges
+        }
+        
+        // Draw mast
         ctx.beginPath();
-        ctx.arc(0, 0, 15, 0, Math.PI * 2); // Reduced visual size to 15 (half of physics body size)
-        ctx.fillStyle = '#D2B48C';
-        ctx.strokeStyle = '#8B4513';
-        ctx.lineWidth = 4;
+        ctx.arc(0, 0, mastRadius, 0, Math.PI * 2);
+        ctx.fillStyle = mastGradient;
+        ctx.strokeStyle = this.isHovered ? '#FFD700' : '#8B4513'; // Gold for hover, brown normally
+        ctx.lineWidth = this.isHovered ? 5 : 4;
         ctx.fill();
         ctx.stroke();
         
@@ -360,11 +392,37 @@ export class SailModule extends BaseModule {
             const curveAmount = 10 + this.openness * 0.9; // Curve amount based on openness
             ctx.quadraticCurveTo(curveAmount, 0, 0, -130);
             ctx.closePath();
-            ctx.fillStyle = 'rgba(255,255,255,0.8)';
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2;
+            
+            // Create sail gradient
+            const sailGradient = ctx.createLinearGradient(0, -130, 0, 130);
+            
+            if (this.isHovered) {
+                // Highlight gradient for sail when hovered
+                sailGradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)'); // White
+                sailGradient.addColorStop(0.5, 'rgba(255, 253, 208, 0.9)'); // Slightly yellow
+                sailGradient.addColorStop(1, 'rgba(255, 255, 255, 0.9)'); // White
+            } else {
+                // Normal gradient for sail
+                sailGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)'); // White
+                sailGradient.addColorStop(0.5, 'rgba(240, 240, 240, 0.8)'); // Slightly darker
+                sailGradient.addColorStop(1, 'rgba(255, 255, 255, 0.8)'); // White
+            }
+            
+            ctx.fillStyle = sailGradient;
+            ctx.strokeStyle = this.isHovered ? '#FFD700' : '#000000'; // Gold for hover, black normally
+            ctx.lineWidth = this.isHovered ? 3 : 2;
             ctx.fill();
             ctx.stroke();
+            
+            // If hovered, add a faint glow effect around the sail
+            if (this.isHovered) {
+                ctx.shadowColor = 'rgba(255, 215, 0, 0.6)'; // Gold glow
+                ctx.shadowBlur = 10;
+                ctx.lineWidth = 1;
+                ctx.stroke(); // Stroke again with shadow for glow effect
+                ctx.shadowBlur = 0; // Reset shadow
+            }
+            
             ctx.restore();
         }
         

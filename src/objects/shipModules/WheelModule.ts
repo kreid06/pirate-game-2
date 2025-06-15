@@ -1,7 +1,8 @@
 // WheelModule.ts - Specialized class for ship steering wheel
-import { BaseModule } from './BaseModule';
+import { BaseModule, ModuleTooltipInfo } from './BaseModule';
 import Matter from 'matter-js';
 import { getModuleBodyProperties } from '../../utils/modulePhysics';
+import { Color } from '../../utils/color';
 
 export class WheelModule extends BaseModule {
     wheelAngle: number = 0; // Current rotation of the wheel (-30 to +30 degrees)
@@ -60,61 +61,112 @@ export class WheelModule extends BaseModule {
             this.useInstruction = "Press E to take control";
         }
     }
-    
-    // Override getTooltipInfo to include wheel-specific info
-    override getTooltipInfo() {
+      // Override getTooltipInfo to include wheel-specific info
+    override getTooltipInfo(): ModuleTooltipInfo {
         const info = super.getTooltipInfo();
         const turnDirection = this.wheelAngle > 0 ? "Right" : this.wheelAngle < 0 ? "Left" : "Center";
         const turnStrength = Math.abs(this.wheelAngle) / 30 * 100;
         
         return {
             ...info,
-            description: `${info.description}\nCurrent direction: ${turnDirection} (${Math.round(turnStrength)}% strength)`
+            description: `${info.description}\nCurrent direction: ${turnDirection} (${Math.round(turnStrength)}% strength)`,
+            effectiveness: this.effectiveness
         };
-    }
-    
-    // Draw the wheel at its position
+    }    // Draw the wheel at its position
     draw(ctx: CanvasRenderingContext2D): void {
         ctx.save();
         ctx.translate(this.position.x, this.position.y);
         
         // Draw wheel base (stand)
+        // Create a gradient for the base
+        const baseGradient = ctx.createLinearGradient(-12, -25, 12, 25);
+        
+        if (this.isHovered) {
+            // Highlight gradient for base when hovered
+            baseGradient.addColorStop(0, '#8B4513'); // Brown
+            baseGradient.addColorStop(0.5, '#CD853F'); // Peru (lighter brown)
+            baseGradient.addColorStop(1, '#8B4513'); // Brown
+        } else {
+            // Normal gradient for base
+            baseGradient.addColorStop(0, '#8B4513'); // Brown
+            baseGradient.addColorStop(0.5, '#A0522D'); // Sienna (slightly lighter)
+            baseGradient.addColorStop(1, '#8B4513'); // Brown
+        }
+        
         ctx.beginPath();
         ctx.rect(-12, -25, 24, 50);
-        ctx.fillStyle = '#8B4513'; // Brown for wooden stand
+        ctx.fillStyle = baseGradient;
         ctx.fill();
-        ctx.strokeStyle = '#654321'; // Darker brown for outline
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = this.isHovered ? '#FFD700' : '#654321'; // Gold for hover, dark brown normally
+        ctx.lineWidth = this.isHovered ? 3 : 2;
         ctx.stroke();
         
         // Draw wheel with rotation
         ctx.save();
         ctx.rotate(this.wheelAngle * Math.PI / 180); // Apply the wheel's angle
         
-        // Outer wheel circle
+        // Outer wheel circle with radial gradient
+        const outerWheelGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
+        
+        if (this.isHovered) {
+            // Highlight gradient for outer wheel when hovered
+            outerWheelGradient.addColorStop(0, '#8B4513'); // Brown
+            outerWheelGradient.addColorStop(0.7, '#CD853F'); // Peru (lighter)
+            outerWheelGradient.addColorStop(1, '#DEB887'); // Burlywood (even lighter)
+        } else {
+            // Normal gradient for outer wheel
+            outerWheelGradient.addColorStop(0, '#654321'); // Dark brown
+            outerWheelGradient.addColorStop(1, '#5D4037'); // Even darker brown
+        }
+        
         ctx.beginPath();
         ctx.arc(0, 0, 20, 0, Math.PI * 2);
-        ctx.fillStyle = '#654321'; // Dark brown for wheel
+        ctx.fillStyle = outerWheelGradient;
+        ctx.strokeStyle = this.isHovered ? '#FFD700' : '#3E2723'; // Gold for hover, very dark brown normally
+        ctx.lineWidth = this.isHovered ? 3 : 2;
         ctx.fill();
-        ctx.strokeStyle = '#3E2723'; // Even darker brown for outline
-        ctx.lineWidth = 2;
         ctx.stroke();
         
-        // Inner wheel circle
+        // Inner wheel circle with radial gradient
+        const innerWheelGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 15);
+        
+        if (this.isHovered) {
+            // Highlight gradient for inner wheel when hovered
+            innerWheelGradient.addColorStop(0, '#CD853F'); // Peru (lighter brown)
+            innerWheelGradient.addColorStop(1, '#A0522D'); // Sienna
+        } else {
+            // Normal gradient for inner wheel
+            innerWheelGradient.addColorStop(0, '#8B4513'); // Brown
+            innerWheelGradient.addColorStop(1, '#654321'); // Darker brown
+        }
+        
         ctx.beginPath();
         ctx.arc(0, 0, 15, 0, Math.PI * 2);
-        ctx.fillStyle = '#8B4513'; // Medium brown for inner wheel
+        ctx.fillStyle = innerWheelGradient;
         ctx.fill();
         
         // Draw wheel spokes
-        ctx.strokeStyle = '#3E2723';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = this.isHovered ? '#FFD700' : '#3E2723'; // Gold for hover, dark brown normally
+        ctx.lineWidth = this.isHovered ? 4 : 3;
+        
         for (let i = 0; i < 8; i++) {
             ctx.beginPath();
             ctx.moveTo(0, 0);
             const angle = (i * Math.PI) / 4;
             ctx.lineTo(Math.cos(angle) * 18, Math.sin(angle) * 18);
             ctx.stroke();
+        }
+        
+        // If hovered, add a faint glow effect
+        if (this.isHovered) {
+            ctx.shadowColor = 'rgba(255, 215, 0, 0.6)'; // Gold glow
+            ctx.shadowBlur = 8;
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 22, 0, Math.PI * 2); // Slightly larger than the wheel
+            ctx.stroke();
+            ctx.shadowBlur = 0; // Reset shadow
         }
         
         ctx.restore(); // Restore from rotation

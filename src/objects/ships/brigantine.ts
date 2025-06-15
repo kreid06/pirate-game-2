@@ -6,7 +6,7 @@ import { BaseGameObject } from '../objects';
 import { createCompleteHullSegments, PlankSegment, getQuadraticPoint } from './plankUtils';
 import { SailModule } from '../shipModules/SailModule';
 import { WheelModule } from '../shipModules/WheelModule';
-import { BaseModule } from '../shipModules/BaseModule';
+import { BaseModule, ModuleTooltipInfo } from '../shipModules/BaseModule';
 
 export class Brigantine extends Ships {
     private sailSize: number;
@@ -630,8 +630,7 @@ export class Brigantine extends Ships {
         path.closePath();
         return path;
     }
-    
-    /**
+      /**
      * Draw the ship's planks (hull sections)
      * @param ctx The canvas rendering context
      */
@@ -642,16 +641,62 @@ export class Brigantine extends Ships {
         
         // Draw each plank segment
         for (const segment of this.plankSegments) {
-            // Draw the main plank
+            // Check if this segment corresponds to a hovered plank
+            let isHovered = false;
+            
+            if (this.hoveredPlankBody) {
+                // Calculate center point of this segment
+                const centerX = (segment.start.x + segment.end.x) / 2;
+                const centerY = (segment.start.y + segment.end.y) / 2;
+                
+                // Convert to world coordinates
+                const worldCenterX = this.position.x + centerX * Math.cos(this.rotation) - centerY * Math.sin(this.rotation);
+                const worldCenterY = this.position.y + centerX * Math.sin(this.rotation) + centerY * Math.cos(this.rotation);
+                
+                // Check if this point is close to the hovered plank body's center
+                const hoveredBodyX = this.hoveredPlankBody.position.x;
+                const hoveredBodyY = this.hoveredPlankBody.position.y;
+                
+                // Calculate distance
+                const dx = worldCenterX - hoveredBodyX;
+                const dy = worldCenterY - hoveredBodyY;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                
+                // If close enough, consider it hovered
+                isHovered = distance < 20; // Adjusted threshold for better matching
+            }
+            
+            // Draw the main plank with highlight if hovered
             ctx.beginPath();
             ctx.moveTo(segment.start.x, segment.start.y);
             ctx.lineTo(segment.end.x, segment.end.y);
-            ctx.stroke();
+            
+            // Adjust line width and color if hovered
+            if (isHovered) {
+                // Save original context
+                ctx.save();
+                
+                // Draw highlighted plank
+                ctx.lineWidth = 12; // Slightly thicker for highlight
+                ctx.strokeStyle = '#CD853F'; // Lighter brown for highlight
+                ctx.stroke();
+                
+                // Draw yellow glow around the plank
+                ctx.lineWidth = 14;
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)'; // Semi-transparent yellow
+                ctx.stroke();
+                
+                // Restore original context
+                ctx.restore();
+            } else {
+                // Regular plank drawing
+                ctx.stroke();
+            }
             
             // Add wood grain texture effect
             ctx.save();
             ctx.lineWidth = 1;
-            ctx.strokeStyle = 'rgba(139, 69, 19, 0.5)'; // Transparent darker brown for grain
+            ctx.strokeStyle = isHovered ? 'rgba(205, 133, 63, 0.6)' : 'rgba(139, 69, 19, 0.5)'; // Lighter for hovered planks
             
             // Calculate perpendicular direction for grain lines
             const dx = segment.end.x - segment.start.x;
@@ -1259,48 +1304,160 @@ export class Brigantine extends Ships {
             if (module.isPointHovering(x, y)) {
                 return module;
             }
-        }
-        
-        // Check if it's hovering over a plank
-        if (this.isPointHoveringPlank(x, y)) {
-            // Create a "fake" module for plank hover
-            const plankModule = new BaseModule('plank', { x: 0, y: 0 });
-            plankModule.attachToShip(this);
+        }        // Check if it's hovering over a plank
+        if (this.isPointHoveringPlank(x, y)) {            // Create a specialized PlankModule class that extends BaseModule
+            class PlankModule extends BaseModule {
+                private mouseX: number;
+                private mouseY: number;
+                private ship: Brigantine;
+                
+                constructor(ship: Brigantine, mouseX: number, mouseY: number) {
+                    super('plank', { x: 0, y: 0 });
+                    this.attachToShip(ship);
+                    this.ship = ship;
+                    this.mouseX = mouseX;
+                    this.mouseY = mouseY;
+                    
+                    // Set plank-specific tooltip info
+                    this.name = "Ship Plank";
+                    this.description = "Structural component of the ship's hull";
+                    this.health = ship.plankHealth;
+                    this.maxHealth = 100;
+                    this.quality = "Standard";
+                    this.effectiveness = ship.plankHealth / 100;
+                    this.useInstruction = "Repair with wood resources";
+                    
+                    // Set hovered state to true immediately
+                    this.setHovered(true);
+                }
+                
+                // Override getWorldPosition to return mouse position
+                override getWorldPosition(): { x: number, y: number } {
+                    return { x: this.mouseX, y: this.mouseY };
+                }
+                
+                // Properly override the getTooltipInfo method
+                override getTooltipInfo(): ModuleTooltipInfo {
+                    return {
+                        name: this.name,
+                        description: this.description,
+                        health: this.health,
+                        maxHealth: this.maxHealth,
+                        quality: this.quality,
+                        effectiveness: this.effectiveness,
+                        useInstruction: this.useInstruction
+                    };
+                }
+            }
             
-            // Set plank-specific tooltip info
-            const plankInfo = {
-                name: "Ship Plank",
-                description: "Structural component of the ship's hull",
-                health: this.plankHealth,
-                maxHealth: 100,
-                quality: "Standard",
-                effectiveness: this.plankHealth / 100,
-                useInstruction: "Repair with wood resources"
-            };
-            
-            // Override getTooltipInfo method for this temporary module
-            plankModule.getTooltipInfo = () => plankInfo;
-            
-            return plankModule;
+            // Create a new instance of the PlankModule class with mouse position
+            return new PlankModule(this, x, y);
         }
         
         return null;
-    }
-    
-    /**
+    }    /**
      * Check if a point is hovering over any ship plank
      */
     private isPointHoveringPlank(x: number, y: number): boolean {
-        if (!this.plankBodies || this.plankBodies.length === 0) return false;
+        if (!this.plankBodies || this.plankBodies.length === 0) {
+            console.log("No plank bodies found for hover check");
+            this.hoveredPlankBody = null;
+            return false;
+        }
         
-        // Check each plank body
+        // Use Matter.js Query.point to check if the point is inside any plank body
+        const world = this.physicsEngine ? this.physicsEngine.getWorld() : null;
+        if (!world) {
+            console.warn("Physics world not available for plank hover check");
+            this.hoveredPlankBody = null;
+            return false;
+        }
+        
+        // First check using Matter.js Query for more accurate collision detection
+        const bodiesAtPoint = Matter.Query.point(this.plankBodies, { x, y });
+        
+        if (bodiesAtPoint.length > 0) {
+            console.log(`Hovering over plank with health: ${this.plankHealth}% (Query.point)`);
+            this.hoveredPlankBody = bodiesAtPoint[0];
+            return true;
+        }
+        
+        // As a fallback, check each plank body's bounds
         for (const plank of this.plankBodies) {
-            if (Matter.Bounds.contains(plank.bounds, { x, y })) {
-                return true;
+            // Get plank bounds
+            const bounds = plank.bounds;
+            
+            // For debugging, log some plank bodies' positions and bounds
+            if (Math.random() < 0.01) { // Only log occasionally to avoid console spam
+                console.log(`Plank body position: (${plank.position.x}, ${plank.position.y}), ` +
+                            `bounds: (${bounds.min.x}, ${bounds.min.y}) to (${bounds.max.x}, ${bounds.max.y}), ` +
+                            `mouse at: (${x}, ${y})`);
+            }
+            
+            // Simple bounds check
+            if (x >= bounds.min.x && x <= bounds.max.x && 
+                y >= bounds.min.y && y <= bounds.max.y) {
+                
+                // More precise check for rotated rectangles
+                // Convert point to local coordinates relative to plank
+                const cosA = Math.cos(-plank.angle);
+                const sinA = Math.sin(-plank.angle);
+                const dx = x - plank.position.x;
+                const dy = y - plank.position.y;
+                const localX = dx * cosA - dy * sinA;
+                const localY = dx * sinA + dy * cosA;
+                
+                // Get half width and height of plank
+                const halfWidth = (bounds.max.x - bounds.min.x) / 2;
+                const halfHeight = (bounds.max.y - bounds.min.y) / 2;
+                
+                // Check if point is within the rectangle in local coordinates
+                if (Math.abs(localX) <= halfWidth && Math.abs(localY) <= halfHeight) {
+                    console.log(`Hovering over plank with health: ${this.plankHealth}% (precise check)`);
+                    this.hoveredPlankBody = plank;
+                    return true;
+                }
             }
         }
         
+        this.hoveredPlankBody = null;
         return false;
+    }
+    
+    /**
+     * Set the health of ship's planks (0-100%)
+     */
+    public setPlankHealth(health: number): void {
+        this.plankHealth = Math.max(0, Math.min(100, health));
+    }
+    
+    /**
+     * Get the current health of ship's planks
+     */
+    public getPlankHealth(): number {
+        return this.plankHealth;
+    }
+    
+    /**
+     * Damage the ship's planks
+     * @param amount Amount of damage to apply (0-100)
+     */
+    public damagePlanks(amount: number): void {
+        this.plankHealth = Math.max(0, this.plankHealth - amount);
+        
+        // If plank health is critical, apply visual effects
+        if (this.plankHealth < 30) {
+            // TODO: Add visual indicators of ship damage
+            console.log(`Ship planks critically damaged: ${this.plankHealth}% health remaining`);
+        }
+    }
+    
+    /**
+     * Repair the ship's planks
+     * @param amount Amount of health to restore (0-100)
+     */
+    public repairPlanks(amount: number): void {
+        this.plankHealth = Math.min(100, this.plankHealth + amount);
     }
     
     /**
@@ -1329,9 +1486,7 @@ export class Brigantine extends Ships {
           // Draw the boarding ladder
         this.drawBoardingLadder(ctx);
         
-        // No longer call drawMasts since SailModule handles all mast drawing
-        
-        // Draw ship modules
+        // No longer call drawMasts since SailModule handles all mast drawing        // Draw ship modules
         this.modules.forEach((module: BaseModule) => {
             if (module instanceof SailModule) {
                 module.draw(ctx);
@@ -1342,5 +1497,80 @@ export class Brigantine extends Ships {
         
         // Restore context
         ctx.restore();
+        
+        // Add debug visualization for plank bodies when debug mode is on
+        if (BaseGameObject.isDebugMode()) {
+            this.renderPlankBodyDebug(ctx);
+        }
     }
+    
+    /**
+     * Draw debug outlines for plank bodies to help with hover detection debugging
+     */
+    private renderPlankBodyDebug(ctx: CanvasRenderingContext2D): void {
+        if (!this.plankBodies || this.plankBodies.length === 0) return;
+        
+        ctx.save();
+        
+        // Draw outlines for each plank body
+        for (const plank of this.plankBodies) {
+            const bounds = plank.bounds;
+            
+            // Draw bounds as a rectangle
+            ctx.strokeStyle = 'rgba(255, 0, 255, 0.5)'; // Magenta for bounds
+            ctx.lineWidth = 1;
+            ctx.strokeRect(
+                bounds.min.x, 
+                bounds.min.y,
+                bounds.max.x - bounds.min.x,
+                bounds.max.y - bounds.min.y
+            );
+            
+            // Draw the actual rotated rectangle shape
+            ctx.save();
+            ctx.translate(plank.position.x, plank.position.y);
+            ctx.rotate(plank.angle);
+            
+            // Calculate half width and height
+            const halfWidth = (bounds.max.x - bounds.min.x) / 2;
+            const halfHeight = (bounds.max.y - bounds.min.y) / 2;
+            
+            // Draw rectangle centered at origin (0,0)
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.7)'; // Cyan for actual shape
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-halfWidth, -halfHeight, halfWidth * 2, halfHeight * 2);
+            
+            ctx.restore();
+        }
+        
+        ctx.restore();
+    }
+    
+    /**
+     * Test if mouse hover detection is working by force-checking at the current mouse position
+     * This is a debugging method to be called from the console
+     */
+    public testPlankHover(mouseX: number, mouseY: number): void {
+        console.log(`Testing plank hover at (${mouseX}, ${mouseY})`);
+        console.log(`Plank bodies count: ${this.plankBodies ? this.plankBodies.length : 0}`);
+        
+        // Test if the point is hovering over any plank
+        const isHovering = this.isPointHoveringPlank(mouseX, mouseY);
+        console.log(`Is hovering over plank: ${isHovering}`);
+        
+        // Log some sample plank bodies for debugging
+        if (this.plankBodies && this.plankBodies.length > 0) {
+            console.log("Sample plank bodies:");
+            for (let i = 0; i < Math.min(3, this.plankBodies.length); i++) {
+                const plank = this.plankBodies[i];
+                console.log(`Plank ${i}: position=(${plank.position.x}, ${plank.position.y}), ` +
+                            `angle=${plank.angle}, ` +
+                            `bounds=((${plank.bounds.min.x}, ${plank.bounds.min.y}), (${plank.bounds.max.x}, ${plank.bounds.max.y}))`);
+            }
+        }
+    }
+  
+
+    // Track the currently hovered plank body
+    private hoveredPlankBody: Matter.Body | null = null;
 }

@@ -1149,8 +1149,7 @@ export class Game {
         const mouseWorldPos = this.camera.screenToWorld(mouseScreenPos.x, mouseScreenPos.y);
           // Reset hover state for all modules
         let moduleHovered = false;
-        
-        // If the player is boarded on a ship, check for module hover on that ship
+          // If the player is boarded on a ship, check for module hover on that ship
         if (this.player.isOnBoard()) {
             const boardedShip = this.player.getBoardedShip();
             if (boardedShip && boardedShip instanceof Brigantine) {
@@ -1158,11 +1157,26 @@ export class Game {
                 boardedShip.sails.forEach(sail => sail.setHovered(false));
                 boardedShip.wheels.forEach(wheel => wheel.setHovered(false));
                 
+                // Add debug info periodically
+                if (Math.random() < 0.01) { // Only log occasionally
+                    console.log(`Mouse world position: (${mouseWorldPos.x}, ${mouseWorldPos.y})`);
+                    // Test plank hover detection
+                    boardedShip.testPlankHover(mouseWorldPos.x, mouseWorldPos.y);
+                }
+                
                 // Check if mouse is hovering over any module
                 const hoveredModule = boardedShip.getModuleAtPoint(mouseWorldPos.x, mouseWorldPos.y);
                 if (hoveredModule) {
-                    hoveredModule.setHovered(true);
+                    // For PlankModule, hover is already set in the constructor
+                    if (hoveredModule.type !== 'plank') {
+                        hoveredModule.setHovered(true);
+                    }
                     moduleHovered = true;
+                    
+                    // Log that we found a hovered module occasionally
+                    if (Math.random() < 0.01) {
+                        console.log(`Hover detected over ${hoveredModule.type} module`);
+                    }
                 }
             }
         } else {
@@ -1174,8 +1188,7 @@ export class Game {
                 }
             }
         }
-    }
-      /**
+    }    /**
      * Render module tooltips
      * This renders tooltips for any hovered modules
      */
@@ -1184,7 +1197,20 @@ export class Game {
         if (this.player.isOnBoard()) {
             const boardedShip = this.player.getBoardedShip();
             if (boardedShip && boardedShip instanceof Brigantine) {
-                // Render tooltips for all modules
+                // Get mouse position for debug info
+                const mouseScreenPos = this.input.getMousePosition();
+                const mouseWorldPos = this.camera.screenToWorld(mouseScreenPos.x, mouseScreenPos.y);
+                
+                // Check for hover over any module (including planks)
+                const hoveredModule = boardedShip.getModuleAtPoint(mouseWorldPos.x, mouseWorldPos.y);
+                
+                // If we have a hovered module, render its tooltip
+                if (hoveredModule && hoveredModule.getIsHovered()) {
+                    hoveredModule.renderTooltip(ctx);
+                    return; // Only show one tooltip at a time
+                }
+                
+                // Fallback to iterating through each module type if needed
                 boardedShip.sails.forEach(sail => {
                     if (sail.getIsHovered()) {
                         sail.renderTooltip(ctx);

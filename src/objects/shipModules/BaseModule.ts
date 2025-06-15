@@ -95,8 +95,7 @@ export class BaseModule {
             Matter.Body.setAngle(this.body, shipAngle + this.rotation);
         }
     }
-    
-    /**
+      /**
      * Check if a point is hovering over this module
      */
     isPointHovering(x: number, y: number): boolean {
@@ -114,11 +113,21 @@ export class BaseModule {
                 radius = this.body.circleRadius;
             }
             
-            return distance <= radius;
+            const isHovering = distance <= radius;
+            if (isHovering) {
+                // Debug hover detection
+                console.log(`Hovering over ${this.type} module at (${this.position.x}, ${this.position.y})`);
+            }
+            return isHovering;
         }
         
         // For rectangular bodies (like planks or sail fiber)
-        return Matter.Bounds.contains(this.body.bounds, { x, y });
+        const isHovering = Matter.Bounds.contains(this.body.bounds, { x, y });
+        if (isHovering) {
+            // Debug hover detection
+            console.log(`Hovering over ${this.type} module at (${this.position.x}, ${this.position.y})`);
+        }
+        return isHovering;
     }
     
     /**
@@ -171,8 +180,7 @@ export class BaseModule {
             useInstruction: this.useInstruction
         };
     }
-    
-    /**
+      /**
      * Render the tooltip for this module
      */
     renderTooltip(ctx: CanvasRenderingContext2D): void {
@@ -193,13 +201,30 @@ export class BaseModule {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.lineWidth = 2;
         
-        // Position tooltip above the module
-        const tooltipX = pos.x - tooltipWidth / 2;
-        const tooltipY = pos.y - tooltipHeight - 30; // Position above module
+        // Position tooltip near the module/mouse position
+        // For planks (which use mouse position), offset a bit to not cover the cursor
+        const isPlank = this.type === 'plank';
+        const tooltipX = pos.x - tooltipWidth / 2 + (isPlank ? 20 : 0);
+        const tooltipY = pos.y - tooltipHeight - (isPlank ? 10 : 30); // Less offset for planks
+        
+        // Draw the tooltip pointer if it's a plank
+        if (isPlank) {
+            // Draw a pointer triangle from tooltip to mouse
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            ctx.lineTo(tooltipX + 10, tooltipY + tooltipHeight);
+            ctx.lineTo(tooltipX + 30, tooltipY + tooltipHeight);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.stroke();
+        }
         
         // Draw rounded rectangle
         ctx.beginPath();
         ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 5);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
         ctx.fill();
         ctx.stroke();
         

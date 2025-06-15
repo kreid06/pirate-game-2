@@ -29,6 +29,7 @@ export class Color {
     static readonly UI_BACKGROUND: string = 'rgba(0, 0, 0, 0.7)';
     static readonly UI_TEXT: string = '#FFFFFF';
     static readonly UI_HIGHLIGHT: string = '#FFD700'; // Gold
+    static readonly MODULE_HIGHLIGHT: string = 'rgba(255, 255, 0, 0.6)'; // Yellow highlight for hovered modules
     static readonly COMPASS_N: string = '#FF0000'; // Red for North
     static readonly COMPASS_DIRECTION: string = '#FFFFFF';
       // Debug colors
