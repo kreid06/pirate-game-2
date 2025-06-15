@@ -9,12 +9,24 @@ export class WheelModule extends BaseModule {
     
     constructor(position: { x: number; y: number }) {
         super('wheel', position, 0);
+        
+        // Set wheel-specific tooltip info
+        this.name = "Steering Wheel";
+        this.description = "Controls ship direction and turning speed";
+        this.health = 100;
+        this.maxHealth = 100;
+        this.quality = "Standard";
+        this.effectiveness = 1.0;
+        this.useInstruction = "Press E to take control";
     }
     
     // Set the wheel angle
     setWheelAngle(degrees: number): void {
         // Limit the wheel angle to -30 to +30 degrees
         this.wheelAngle = Math.max(-30, Math.min(30, degrees));
+        
+        // Update effectiveness based on wheel angle (full effectiveness at max angle)
+        this.effectiveness = Math.abs(this.wheelAngle) / 30;
     }
     
     // Turn the wheel left by an increment
@@ -34,13 +46,34 @@ export class WheelModule extends BaseModule {
         } else if (this.wheelAngle < 0) {
             this.wheelAngle = Math.min(0, this.wheelAngle + increment);
         }
+        
+        // Update effectiveness
+        this.effectiveness = Math.abs(this.wheelAngle) / 30;
     }
     
     // Set player controlling state
     setPlayerControlling(isControlling: boolean): void {
         this.isPlayerControlling = isControlling;
+        if (isControlling) {
+            this.useInstruction = "Press E to release control";
+        } else {
+            this.useInstruction = "Press E to take control";
+        }
     }
-      // Draw the wheel at its position
+    
+    // Override getTooltipInfo to include wheel-specific info
+    override getTooltipInfo() {
+        const info = super.getTooltipInfo();
+        const turnDirection = this.wheelAngle > 0 ? "Right" : this.wheelAngle < 0 ? "Left" : "Center";
+        const turnStrength = Math.abs(this.wheelAngle) / 30 * 100;
+        
+        return {
+            ...info,
+            description: `${info.description}\nCurrent direction: ${turnDirection} (${Math.round(turnStrength)}% strength)`
+        };
+    }
+    
+    // Draw the wheel at its position
     draw(ctx: CanvasRenderingContext2D): void {
         ctx.save();
         ctx.translate(this.position.x, this.position.y);

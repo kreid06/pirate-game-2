@@ -13,12 +13,24 @@ export class SailModule extends BaseModule {
     
     constructor(position: { x: number; y: number }) {
         super('sail', position, 0); // Sails don't have a rotation property in the same way as cannons
+        
+        // Set sail-specific tooltip info
+        this.name = "Main Sail";
+        this.description = "Controls ship speed and maneuverability";
+        this.health = 100;
+        this.maxHealth = 100;
+        this.quality = "Standard";
+        this.effectiveness = 1.0;
+        this.useInstruction = "Press E to adjust sail";
     }
     
     // Set the sail openness
     setOpenness(percent: number): void {
         // Ensure the value is between 0 and 100
         this.openness = Math.max(0, Math.min(100, percent));
+        
+        // Update effectiveness based on openness
+        this.effectiveness = this.openness / 100;
     }
     
     // Gradually open the sail by an increment
@@ -85,6 +97,9 @@ export class SailModule extends BaseModule {
         
         // Scale efficiency from 0-1 range
         efficiency = Math.min(1, Math.max(0.35, efficiency)) * sailOpenness;
+        
+        // Update the effectiveness property
+        this.effectiveness = efficiency;
         
         return efficiency;
     }

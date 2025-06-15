@@ -176,6 +176,15 @@ export class Game {
         const ctx = this.canvas.getContext();
         if (ctx) {
             this.effectManager.render(ctx);
+            
+            // Apply camera transform to get proper world coordinates for tooltips
+            this.camera.applyTransform(ctx);
+            
+            // Render module tooltips
+            this.renderModuleTooltips(ctx);
+            
+            // Reset camera transform
+            this.camera.resetTransform(ctx);
         }
         
         // Continue the game loop
@@ -194,17 +203,8 @@ export class Game {
         // Update player
         this.player.update(delta);
         
-        // Check if player is dead
-        if (this.player.isDead()) {
-            this.gameState.setGameOver();
-            this.soundManager.playSound('sinking');
-            this.soundManager.playMusic('gameover', true);
-            
-            // Create explosion effect at player position
-            const playerPos = this.player.getPosition();
-            this.effectManager.createExplosion(playerPos.x, playerPos.y, 80);
-            return;
-        }
+        // Update module hover interaction
+        this.updateModuleHoverInteraction();
         
         // Update camera
         this.camera.update();
@@ -347,6 +347,9 @@ export class Game {
         if (this.input.wasKeyJustPressed('e')) {
             console.log('E KEY WAS JUST PRESSED - Detected in testKeyPressHandling');
         }
+        
+        // Check for module hover interaction
+        this.updateModuleHoverInteraction();
     }
     
     /**
@@ -1132,6 +1135,68 @@ export class Game {
         } else {
             // Log why boarding failed
             console.log(`🔑 INTERACT: Cannot board - Player near ladder: ${playerInLadderArea ? '✅' : '❌'} | Mouse hovering ladder: ${mouseHoveringLadder ? '✅' : '❌'} | Ship available: ${nearestShip !== null ? '✅' : '❌'}`);
+        }
+    }
+      /**
+     * Check for module hover interaction
+     * This detects when the mouse is hovering over ship modules and updates their hover state
+     */
+    private updateModuleHoverInteraction(): void {
+        // Get mouse position in screen coordinates
+        const mouseScreenPos = this.input.getMousePosition();
+        
+        // Convert to world coordinates
+        const mouseWorldPos = this.camera.screenToWorld(mouseScreenPos.x, mouseScreenPos.y);
+          // Reset hover state for all modules
+        let moduleHovered = false;
+        
+        // If the player is boarded on a ship, check for module hover on that ship
+        if (this.player.isOnBoard()) {
+            const boardedShip = this.player.getBoardedShip();
+            if (boardedShip && boardedShip instanceof Brigantine) {
+                // Reset hover state on all modules
+                boardedShip.sails.forEach(sail => sail.setHovered(false));
+                boardedShip.wheels.forEach(wheel => wheel.setHovered(false));
+                
+                // Check if mouse is hovering over any module
+                const hoveredModule = boardedShip.getModuleAtPoint(mouseWorldPos.x, mouseWorldPos.y);
+                if (hoveredModule) {
+                    hoveredModule.setHovered(true);
+                    moduleHovered = true;
+                }
+            }
+        } else {
+            // If the player is not boarded, check all ships for ladder hover
+            for (const ship of this.ships) {
+                if (ship instanceof Brigantine) {
+                    const isHovering = ship.isPointHoveringLadder(mouseWorldPos.x, mouseWorldPos.y);
+                    ship.setPlayerHovering(isHovering);
+                }
+            }
+        }
+    }
+      /**
+     * Render module tooltips
+     * This renders tooltips for any hovered modules
+     */
+    private renderModuleTooltips(ctx: CanvasRenderingContext2D): void {
+        // If the player is boarded on a ship
+        if (this.player.isOnBoard()) {
+            const boardedShip = this.player.getBoardedShip();
+            if (boardedShip && boardedShip instanceof Brigantine) {
+                // Render tooltips for all modules
+                boardedShip.sails.forEach(sail => {
+                    if (sail.getIsHovered()) {
+                        sail.renderTooltip(ctx);
+                    }
+                });
+                
+                boardedShip.wheels.forEach(wheel => {
+                    if (wheel.getIsHovered()) {
+                        wheel.renderTooltip(ctx);
+                    }
+                });
+            }
         }
     }
 }

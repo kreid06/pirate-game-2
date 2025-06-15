@@ -23,11 +23,11 @@ export class Brigantine extends Ships {
     
     // Reference to the physics engine
     private physicsEngine: Physics | null = null;
-    
-    // Ship sailing properties
+      // Ship sailing properties
     rudderAngle: number = 0;       // Current rudder angle (-30 to +30 degrees)
     sailsOpenness: number = 0;     // Overall sail openness (0-100%)
     currentWindDirection: number = 0; // Current wind direction
+    plankHealth: number = 100;     // Health percentage of ship planks
     currentWindPower: number = 0;    // Current wind power
     
     // Ship physics properties
@@ -1240,6 +1240,67 @@ export class Brigantine extends Ships {
                 console.log(`Recreated physics body for module ${module.type}`);
             }
         });
+    }
+    
+    /**
+     * Check if a point is hovering over any module on the ship
+     * Returns the module being hovered over, or null if none
+     */
+    public getModuleAtPoint(x: number, y: number): BaseModule | null {
+        // First check all masts/sails
+        for (const [id, module] of this.sails) {
+            if (module.isPointHovering(x, y)) {
+                return module;
+            }
+        }
+        
+        // Then check all wheels
+        for (const [id, module] of this.wheels) {
+            if (module.isPointHovering(x, y)) {
+                return module;
+            }
+        }
+        
+        // Check if it's hovering over a plank
+        if (this.isPointHoveringPlank(x, y)) {
+            // Create a "fake" module for plank hover
+            const plankModule = new BaseModule('plank', { x: 0, y: 0 });
+            plankModule.attachToShip(this);
+            
+            // Set plank-specific tooltip info
+            const plankInfo = {
+                name: "Ship Plank",
+                description: "Structural component of the ship's hull",
+                health: this.plankHealth,
+                maxHealth: 100,
+                quality: "Standard",
+                effectiveness: this.plankHealth / 100,
+                useInstruction: "Repair with wood resources"
+            };
+            
+            // Override getTooltipInfo method for this temporary module
+            plankModule.getTooltipInfo = () => plankInfo;
+            
+            return plankModule;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Check if a point is hovering over any ship plank
+     */
+    private isPointHoveringPlank(x: number, y: number): boolean {
+        if (!this.plankBodies || this.plankBodies.length === 0) return false;
+        
+        // Check each plank body
+        for (const plank of this.plankBodies) {
+            if (Matter.Bounds.contains(plank.bounds, { x, y })) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     /**
