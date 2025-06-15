@@ -1053,15 +1053,31 @@ export class Game {
     /**
      * Handles interaction when the 'E' key is pressed
      * This is called directly by the Input system
-     */
-    private handleInteraction(): void {
+     */    private handleInteraction(): void {
         // If game is over, ignore interaction
         if (this.gameState.isGameOver()) return;
         
-        // Check if player is already on a ship - if so, handle unboarding
+        // Check if player is already on a ship - if so, handle unboarding, but only if near the ladder
         if (this.player.isOnBoard()) {
-            console.log('🔑 INTERACT: Player is disembarking from ship');
-            this.player.unboardShip();
+            const boardedShip = this.player.getBoardedShip();
+            if (boardedShip instanceof Brigantine) {
+                const playerPos = this.player.getPosition();
+                const mouseWorldPos = this.camera.screenToWorld(
+                    this.input.getMousePosition().x, 
+                    this.input.getMousePosition().y
+                );
+                
+                // Only allow deboarding if player is at the ladder
+                const inLadderArea = boardedShip.isPointInLadderArea(playerPos.x, playerPos.y, 70);
+                const isHovering = boardedShip.isPointHoveringLadder(mouseWorldPos.x, mouseWorldPos.y);
+                
+                if (inLadderArea && isHovering) {
+                    console.log('🔑 INTERACT: Player is disembarking from ship at the ladder');
+                    this.player.unboardShip();
+                } else {
+                    console.log('🔑 INTERACT: Cannot disembark - Player must be at the ladder');
+                }
+            }
             return;
         }
         

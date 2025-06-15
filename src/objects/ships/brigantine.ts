@@ -701,8 +701,7 @@ export class Brigantine extends Ships {
             width: ladderLength,
             height: ladderWidth
         };
-        
-        // Change color if player is hovering over the ladder
+          // Change color if player is hovering over the ladder
         let baseFillColor = '#8B4513'; // Default saddle brown
         let highlightFillColor = '#A0522D'; // Default sienna
         
@@ -716,7 +715,13 @@ export class Brigantine extends Ships {
             ctx.fillStyle = 'white';
             ctx.font = '12px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('Press E to board', ladderX + ladderLength/2, promptY);
+            
+            // Show different prompt based on if player is already boarded
+            if (this.playerIsBoarded) {
+                ctx.fillText('Press E to disembark', ladderX + ladderLength/2, promptY);
+            } else {
+                ctx.fillText('Press E to board', ladderX + ladderLength/2, promptY);
+            }
         }
         
         // Create a gradient for 3D effect
