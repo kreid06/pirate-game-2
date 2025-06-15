@@ -210,21 +210,20 @@ export class Player extends BaseGameObject {
         this.boardedShip = ship;
         this.isBoarded = true;
         
-        // Teleport player to the center of the ship
+        // Teleport player to the boarding position near the ladder
         const shipPosition = ship.getPosition();
         const shipRotation = ship.getRotation();
         
-        // Calculate a position on the deck (slightly aft of center for a brigantine)
-        const deckOffsetX = -20; // Slightly aft of center
-        const deckOffsetY = 0;   // Centered horizontally
+        // Get the boarding position in local ship coordinates (near the ladder)
+        const boardingPos = ship.getBoardingPosition();
         
         // Calculate the world position using the ship's rotation
         const cos = Math.cos(shipRotation);
         const sin = Math.sin(shipRotation);
-        const worldX = shipPosition.x + deckOffsetX * cos - deckOffsetY * sin;
-        const worldY = shipPosition.y + deckOffsetX * sin + deckOffsetY * cos;
+        const worldX = shipPosition.x + boardingPos.x * cos - boardingPos.y * sin;
+        const worldY = shipPosition.y + boardingPos.x * sin + boardingPos.y * cos;
         
-        // Teleport the player to the deck position
+        // Teleport the player to the boarding position
         if (this.body) {
             Matter.Body.setPosition(this.body, { x: worldX, y: worldY });
             Matter.Body.setVelocity(this.body, { x: 0, y: 0 }); // Reset velocity

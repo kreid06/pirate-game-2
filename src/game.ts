@@ -104,6 +104,9 @@ export class Game {
         this.physics.addBody(this.player.getBody()!);
         this.renderer.addGameObject(this.player);
         
+        // Set a higher z-index for the player so it renders on top of ships when boarded
+        this.player.setZIndex(10);
+        
         // Initialize enemy-related properties
         this.enemies = [];
         this.enemySpawnTimer = 0;
@@ -441,12 +444,14 @@ export class Game {
                 this.enemies.splice(i, 1);
             }
         }
-    }
-      private spawnBrigantine(spawnX: number, spawnY: number): Brigantine {
+    }      private spawnBrigantine(spawnX: number, spawnY: number): Brigantine {
         // Create a new brigantine enemy ship
         const brigantine: Brigantine = new Brigantine(spawnX, spawnY);
         this.physics.addBody(brigantine.getBody()!);
         this.renderer.addGameObject(brigantine);
+        
+        // Set a lower z-index for ships so the player renders on top when boarded
+        brigantine.setZIndex(5);
         
         // Create the plank bodies for the ship
         try {
@@ -476,14 +481,14 @@ export class Game {
         
         // Set player as its target
         enemy.setTarget(this.player);
-        
-        // Add to physics engine
+          // Add to physics engine
         this.physics.addBody(enemy.getBody()!);
         
         // Add to renderer
         this.renderer.addGameObject(enemy);
         
-        // Add to enemies array
+        // Set a lower z-index for enemy ships, same as player ships
+        enemy.setZIndex(5);// Add to enemies array
         this.enemies.push(enemy);
         
         console.log(`Spawned enemy ship at (${Math.round(spawnX)}, ${Math.round(spawnY)})`);
@@ -666,6 +671,9 @@ export class Game {
         
         this.physics.addBody(this.player.getBody()!);
         this.renderer.addGameObject(this.player);
+        
+        // Set a higher z-index for the player so it renders on top of ships when boarded
+        this.player.setZIndex(10);
         
         // Remove all enemies
         for (const enemy of this.enemies) {

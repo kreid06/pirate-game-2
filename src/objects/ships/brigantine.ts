@@ -853,6 +853,19 @@ export class Brigantine extends Ships {
     }
     
     /**
+     * Get the ideal boarding position in local ship coordinates
+     * Returns a position just inside the ship from the ladder
+     */
+    public getBoardingPosition(): { x: number, y: number } {
+        // Calculate a position inside the ship from the ladder
+        // The ladder is at the stern, so move a bit forward from it
+        const boardingX = this.ladderRect.x + this.ladderRect.width + 10; // Just inside the ship from the ladder
+        const boardingY = 0; // Centered vertically
+        
+        return { x: boardingX, y: boardingY };
+    }
+    
+    /**
      * Draw the ship
      */
     public render(ctx: CanvasRenderingContext2D): void {

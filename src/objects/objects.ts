@@ -7,6 +7,8 @@ export interface GameObject {
     getBody(): Matter.Body | null;
     getPosition(): { x: number, y: number };
     getRotation(): number;
+    getZIndex(): number; // Added method to get rendering order
+    setZIndex(zIndex: number): void; // Added method to set rendering order
     getSpeed?(): number;  // Optional method to get object speed
     getVelocity?(): { x: number, y: number };  // Optional method to get velocity vector
     renderDebug?(ctx: CanvasRenderingContext2D): void; // Debug rendering for physics bodies
@@ -17,6 +19,7 @@ export abstract class BaseGameObject implements GameObject {
     protected rotation: number;
     protected body: Matter.Body | null;
     protected static debugMode: boolean = false; // Global debug mode flag
+    protected zIndex: number = 0; // Default z-index for rendering order
     
     constructor(x: number, y: number) {
         this.position = { x, y };
@@ -79,6 +82,14 @@ export abstract class BaseGameObject implements GameObject {
     public getVelocity(): { x: number, y: number } {
         if (!this.body) return { x: 0, y: 0 };
         return { x: this.body.velocity.x, y: this.body.velocity.y };
+    }
+    
+    public getZIndex(): number {
+        return this.zIndex;
+    }
+    
+    public setZIndex(zIndex: number): void {
+        this.zIndex = zIndex;
     }
     
     /**

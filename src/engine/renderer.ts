@@ -198,15 +198,17 @@ export class Renderer {
             this.renderDebugHUD(ctx);
         }
     }
-    
-    /**
+      /**
      * Renders game objects with reflections at screen edges
      * to create the illusion of a seamless infinite world
      */
     private renderGameObjectsWithReflections(ctx: CanvasRenderingContext2D): void {
         if (!this.camera) return;
         
-        for (const gameObject of this.gameObjects) {
+        // Sort game objects by z-index (lower values are rendered first)
+        const sortedGameObjects = [...this.gameObjects].sort((a, b) => a.getZIndex() - b.getZIndex());
+        
+        for (const gameObject of sortedGameObjects) {
             // Get the object's position
             const pos = gameObject.getPosition();
             const radius = this.getObjectRadius(gameObject);
