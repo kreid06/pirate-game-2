@@ -80,5 +80,7 @@ export const CollisionCategories = {
     TREASURE: 0x0020,
     ISLAND: 0x0040,
     DECK_ELEMENT: 0x0080, // New category for masts, planks, etc. on deck
+    MODULE: 0x0100, // New category for ship modules
+    SAIL_FIBER: 0x0200, // New category specifically for sail fibers/cloth
     ALL: 0xFFFFFFFF
 };

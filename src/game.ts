@@ -452,13 +452,15 @@ export class Game {
         
         // Set a lower z-index for ships so the player renders on top when boarded
         brigantine.setZIndex(5);
-        
-        // Create the plank bodies for the ship
+          // Create the plank bodies for the ship
         try {
             // Call the createPlankBodies method using explicit type assertion
             (brigantine as any).createPlankBodies(this.physics);
+            
+            // Also create the mast bodies for collision
+            (brigantine as any).createMastBodies(this.physics);
         } catch (error) {
-            console.error("Error creating plank bodies:", error);
+            console.error("Error creating ship physics bodies:", error);
         }
         
         this.ships.push(brigantine);

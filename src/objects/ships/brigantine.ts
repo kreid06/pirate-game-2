@@ -4,6 +4,9 @@ import * as Matter from 'matter-js';
 import { Physics } from '../../engine/physics';
 import { BaseGameObject } from '../objects';
 import { createCompleteHullSegments, PlankSegment, getQuadraticPoint } from './plankUtils';
+import { SailModule } from '../shipModules/SailModule';
+import { WheelModule } from '../shipModules/WheelModule';
+import { BaseModule } from '../shipModules/BaseModule';
 
 export class Brigantine extends Ships {
     private sailSize: number;
@@ -11,8 +14,26 @@ export class Brigantine extends Ships {
     // Add boarding ladder properties
     private ladderRect: { x: number, y: number, width: number, height: number };
     private playerInLadderArea: boolean = false;
-    private playerIsHovering: boolean = false;
+    private playerIsHovering: boolean = false;    
     private playerIsBoarded: boolean = false;
+    
+    // Ship modules collections
+    modules: Map<string, BaseModule> = new Map();
+    sails: Map<string, SailModule> = new Map();
+    wheels: Map<string, WheelModule> = new Map();
+    
+    // Ship sailing properties
+    rudderAngle: number = 0;       // Current rudder angle (-30 to +30 degrees)
+    sailsOpenness: number = 0;     // Overall sail openness (0-100%)
+    currentWindDirection: number = 0; // Current wind direction
+    currentWindPower: number = 0;    // Current wind power
+    
+    // Ship physics properties
+    forwardForce: number = 0;      // Current forward propulsion force
+    turningForce: number = 0;      // Current turning force
+    momentum: number = 0;          // Ship's current momentum (affects turning)
+    isRotatingSails: boolean = false; // Flag to track when sails are being actively rotated
+    sailRotationTimer: number = 0;    // Timer to track how long sails have been rotating
     
     // Properties for ship planks (hull segments)
     private plankBodies: Matter.Body[] = [];
@@ -22,9 +43,7 @@ export class Brigantine extends Ships {
         thickness: number,
         sectionName: string,
         index: number 
-    }[] = [];
-    
-    constructor(x: number, y: number) {
+    }[] = [];    constructor(x: number, y: number) {
         // Brigantine is a medium-sized ship
         super(x, y, 80, 30, 100);
         this.sailSize = 40;
@@ -32,29 +51,93 @@ export class Brigantine extends Ships {
         // Initialize ladder rectangle (will be positioned correctly in update)
         this.ladderRect = { x: 0, y: 0, width: 60, height: 30 };
         
+        // Initialize ship modules based on mast positions
+        const mainSail = new SailModule({ x: 0, y: 0 }); // Main mast (center)
+        const foreSail = new SailModule({ x: 100, y: 0 }); // Fore mast (front)
+        const wheel = new WheelModule({ x: -90, y: 0 }); // Steering wheel (back)
+        
+        // Add modules to the ship
+        this.addModule('main_sail', mainSail);
+        this.addModule('fore_sail', foreSail);
+        this.addModule('wheel', wheel);
+        
         // Create custom physics body
         this.createPhysicsBody();
     }
     
     /**
-     * Set whether the player is boarded
+     * Add a module to the ship
      */
-    public setPlayerBoarded(boarded: boolean, playerBody?: Matter.Body): void {
+    addModule(id: string, module: BaseModule): boolean {
+        // Store in the general modules map
+        this.modules.set(id, module);
+        
+        // Also store in the type-specific collection
+        if (module instanceof SailModule) {
+            this.sails.set(id, module);
+        } else if (module instanceof WheelModule) {
+            this.wheels.set(id, module);
+        }
+        
+        // Attach the module to the ship
+        module.attachToShip(this);
+        
+        // Create physics body for the module if the ship has a body
+        if (this.body && module.createPhysicsBody) {
+            module.createPhysicsBody(this.body, Matter.World.create({}));
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Remove a module from the ship
+     */
+    removeModule(id: string): boolean {
+        if (!this.modules.has(id)) {
+            return false;
+        }
+        
+        // Get the module before deleting it
+        const module = this.modules.get(id)!;
+        
+        // Remove module from type-specific collections
+        if (module instanceof SailModule) {
+            this.sails.delete(id);
+        } else if (module instanceof WheelModule) {
+            this.wheels.delete(id);
+        }
+        
+        // Remove physics body
+        if (module.removePhysicsBody) {
+            module.removePhysicsBody();
+        }
+        
+        // Remove from modules map
+        this.modules.delete(id);
+        
+        return true;
+    }
+    
+    /**
+     * Set whether the player is boarded
+     */    public setPlayerBoarded(boarded: boolean, playerBody?: Matter.Body): void {
         this.playerIsBoarded = boarded;
         
         // If a player body is provided, update its collision filtering
         if (playerBody) {
             if (boarded) {
-                // When boarded, player should collide with deck elements but not the ship hull
+                // When boarded, player should collide with deck elements and modules but not the ship hull or sail fibers
                 playerBody.collisionFilter = {
                     category: CollisionCategories.PLAYER,
-                    mask: CollisionCategories.DECK_ELEMENT | CollisionCategories.ENEMY | 
-                          CollisionCategories.POWERUP | CollisionCategories.TREASURE,
+                    mask: CollisionCategories.DECK_ELEMENT | CollisionCategories.MODULE | 
+                          CollisionCategories.ENEMY | CollisionCategories.POWERUP | 
+                          CollisionCategories.TREASURE,
                     group: 0
                 };
                 
-                // Log that player is now set to collide with deck elements
-                console.log("Player boarded ship - Now collides with deck elements");
+                // Log that player is now set to collide with deck elements and modules
+                console.log("Player boarded ship - Now collides with deck elements and modules");
             } else {
                 // When not boarded, restore normal collision filtering
                 playerBody.collisionFilter = {
@@ -229,6 +312,77 @@ export class Brigantine extends Ships {
     }
     
     /**
+     * Create physics bodies for the masts
+     * @param physics Physics engine instance
+     */
+    public createMastBodies(physics: Physics): void {
+        console.log("Creating mast bodies for brigantine...");
+        
+        // Create physics bodies for each mast
+        for (const mast of Brigantine.MASTS) {
+            try {
+                // Calculate world position based on ship position and rotation
+                const cosRot = Math.cos(this.rotation);
+                const sinRot = Math.sin(this.rotation);
+                const worldX = this.position.x + mast.x * cosRot - mast.y * sinRot;
+                const worldY = this.position.y + mast.x * sinRot + mast.y * cosRot;
+                
+                // Create a circular body for the mast base
+                const mastBaseBody = Matter.Bodies.circle(
+                    worldX,
+                    worldY,
+                    mast.r,
+                    {
+                        isStatic: true, // Masts are static
+                        collisionFilter: {
+                            category: CollisionCategories.DECK_ELEMENT,
+                            mask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE,
+                            group: 0
+                        },
+                        render: {
+                            visible: false // We'll render these manually
+                        },
+                        label: `brigantine_mast_base_${mast.x}_${mast.y}`
+                    }
+                );
+                
+                // Create a rectangle body for the mast post
+                const mastWidth = mast.r * 0.8;
+                const mastHeight = mast.r * 12; // Same height as visual representation
+                
+                const mastPostBody = Matter.Bodies.rectangle(
+                    worldX,
+                    worldY - mastHeight / 2, // Position up from the base
+                    mastWidth,
+                    mastHeight,
+                    {
+                        isStatic: true, // Masts are static
+                        collisionFilter: {
+                            category: CollisionCategories.DECK_ELEMENT,
+                            mask: CollisionCategories.PLAYER | CollisionCategories.PROJECTILE,
+                            group: 0
+                        },
+                        render: {
+                            visible: false // We'll render these manually
+                        },
+                        label: `brigantine_mast_post_${mast.x}_${mast.y}`
+                    }
+                );
+                
+                // Add the bodies to the world
+                Matter.World.add(physics.getWorld(), [mastBaseBody, mastPostBody]);
+                
+                // Store the bodies for future reference
+                this.plankBodies.push(mastBaseBody, mastPostBody); // Store with plank bodies for simplicity
+                
+                console.log(`Created mast bodies at position ${mast.x}, ${mast.y}`);
+            } catch (error) {
+                console.error(`Error creating mast body: ${error}`);
+            }
+        }
+    }
+    
+    /**
      * Update the physics bodies for the planks based on ship position and rotation
      */
     public updatePlankBodies(): void {
@@ -278,14 +432,25 @@ export class Brigantine extends Ships {
     
     /**
      * Override the base update method to also update plank bodies
-     */
-    public override update(delta: number): void {
+     */    public override update(delta: number): void {
         // Call the base class update to sync position and rotation with physics body
         super.update(delta);
         
         // Update the plank bodies to match the ship's position and rotation
         if (this.plankBodies.length > 0) {
             this.updatePlankBodies();
+        }
+        
+        // Update ship modules
+        if (this.sails) this.sails.forEach(sail => sail.update());
+        if (this.wheels) this.wheels.forEach(wheel => wheel.update());
+        
+        // Update sail rotation timer
+        if (this.sailRotationTimer > 0) {
+            this.sailRotationTimer -= delta;
+            if (this.sailRotationTimer <= 0) {
+                this.isRotatingSails = false;
+            }
         }
     }
     
@@ -638,75 +803,39 @@ export class Brigantine extends Ships {
             ctx.stroke();
         }
     }
+      /**
+     * Define the mast positions for the ship
+     */
+    private static readonly MASTS = [
+        { x: 100, y: 0, r: 15 },   // Front mast (fore)
+        { x: 0, y: 0, r: 15 },     // Middle mast (main)
+        { x: -235, y: 0, r: 15 },  // Back mast (mizzen)
+    ];
+    
+    /**
+     * Define the wheel position and shape
+     */
+    private static readonly WHEEL = { x: -90, y: 0, w: 20, h: 40 };
     
     /**
      * Draw the ship's masts
      */
     private drawMasts(ctx: CanvasRenderingContext2D): void {
-        // First mast - main mast
-        const mainMastX = 0;
-        const mainMastY = 0;
-        const mainMastHeight = 180;
-        const mainMastWidth = 12;
-        
-        ctx.fillStyle = '#8B4513'; // Brown
-        ctx.fillRect(mainMastX - mainMastWidth/2, mainMastY - mainMastHeight/2, mainMastWidth, mainMastHeight);
-        
-        // Draw main sail (larger sail)
-        const mainSailWidth = this.sailSize * 2;
-        const mainSailHeight = this.sailSize * 3;
-        
-        ctx.fillStyle = '#F8F8FF'; // Off-white for sails
-        ctx.beginPath();
-        ctx.moveTo(mainMastX, mainMastY - mainMastHeight/2 + 10); // Top of mast
-        ctx.lineTo(mainMastX - mainSailWidth/2, mainMastY); // Left edge of sail
-        ctx.lineTo(mainMastX, mainMastY + mainSailHeight/2); // Bottom point of sail
-        ctx.closePath();
-        ctx.fill();
-        
-        // Add some sail detail
-        ctx.strokeStyle = '#DDD';
-        ctx.lineWidth = 1;
-        for (let i = 1; i < 5; i++) {
-            const y = mainMastY - mainMastHeight/2 + 10 + (mainSailHeight * i / 5);
-            const leftX = mainMastX - (mainSailWidth/2) * (1 - i/5);
-            
+        // Draw mast bases - the sails themselves are drawn by the SailModule
+        for (const mast of Brigantine.MASTS) {
+            // Draw mast base
+            ctx.fillStyle = '#8B4513'; // Brown
             ctx.beginPath();
-            ctx.moveTo(leftX, y);
-            ctx.lineTo(mainMastX, y);
+            ctx.arc(mast.x, mast.y, mast.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#654321'; // Darker brown for border
+            ctx.lineWidth = 2;
             ctx.stroke();
-        }
-        
-        // Second mast - fore mast
-        const foreMastX = 100;
-        const foreMastY = 0;
-        const foreMastHeight = 150;
-        const foreMastWidth = 10;
-        
-        ctx.fillStyle = '#8B4513'; // Brown
-        ctx.fillRect(foreMastX - foreMastWidth/2, foreMastY - foreMastHeight/2, foreMastWidth, foreMastHeight);
-        
-        // Draw fore sail (smaller sail)
-        const foreSailWidth = this.sailSize * 1.5;
-        const foreSailHeight = this.sailSize * 2.5;
-        
-        ctx.fillStyle = '#F8F8FF'; // Off-white for sails
-        ctx.beginPath();
-        ctx.moveTo(foreMastX, foreMastY - foreMastHeight/2 + 10); // Top of mast
-        ctx.lineTo(foreMastX - foreSailWidth/2, foreMastY); // Left edge of sail
-        ctx.lineTo(foreMastX, foreMastY + foreSailHeight/2); // Bottom point of sail
-        ctx.closePath();
-        ctx.fill();
-        
-        // Add some sail detail
-        for (let i = 1; i < 4; i++) {
-            const y = foreMastY - foreMastHeight/2 + 10 + (foreSailHeight * i / 4);
-            const leftX = foreMastX - (foreSailWidth/2) * (1 - i/4);
             
-            ctx.beginPath();
-            ctx.moveTo(leftX, y);
-            ctx.lineTo(foreMastX, y);
-            ctx.stroke();
+            // Draw mast post
+            const mastWidth = mast.r * 0.8;
+            const mastHeight = mast.r * 12; // Taller masts
+            ctx.fillRect(mast.x - mastWidth/2, mast.y - mastHeight/2, mastWidth, mastHeight);
         }
     }
     
@@ -805,8 +934,7 @@ export class Brigantine extends Ships {
         // Restore context
         ctx.restore();
     }
-    
-    /**
+      /**
      * Test and visualize the walkable area on the ship deck for debugging
      */
     private testWalkableArea(ctx: CanvasRenderingContext2D, pointCount: number): void {
@@ -855,14 +983,305 @@ export class Brigantine extends Ships {
     /**
      * Get the ideal boarding position in local ship coordinates
      * Returns a position just inside the ship from the ladder
-     */
-    public getBoardingPosition(): { x: number, y: number } {
+     */    public getBoardingPosition(): { x: number, y: number } {
         // Calculate a position inside the ship from the ladder
         // The ladder is at the stern, so move a bit forward from it
         const boardingX = this.ladderRect.x + this.ladderRect.width + 10; // Just inside the ship from the ladder
         const boardingY = 0; // Centered vertically
         
         return { x: boardingX, y: boardingY };
+    }
+    
+    /**
+     * Apply rudder control to turn the ship
+     */
+    applyRudder(direction: 'left' | 'right' | 'center'): void {
+        // Make rudder change rate more gradual
+        const baseRudderChangeRate = 0.5; // Base rate for rudder change
+        
+        // Calculate current ship speed
+        const currentSpeed = Math.sqrt(
+            this.body!.velocity.x ** 2 + 
+            this.body!.velocity.y ** 2
+        );
+        
+        // Update the ship's momentum value (used for turning calculations)
+        // Momentum builds up more at higher speeds, making turning harder
+        this.momentum = Math.min(1.0, this.momentum * 0.95 + currentSpeed * 0.01);
+
+        // Adjust rudder change rate based on current ship speed
+        // For visual feedback, we actually want faster rudder movement at higher speeds
+        // This gives a value between 0.5 and 1.2 times the base rate
+        const visualSpeedFactor = 0.5 + Math.min(0.7, currentSpeed / 3);
+        const rudderChangeRate = baseRudderChangeRate * visualSpeedFactor;
+        
+        // Adjust rudder angle based on input with the dynamic change rate
+        switch (direction) {
+            case 'left':
+                this.rudderAngle = Math.max(-30, this.rudderAngle - rudderChangeRate);
+                break;
+            case 'right':
+                this.rudderAngle = Math.min(30, this.rudderAngle + rudderChangeRate);
+                break;
+            case 'center':
+                // Return rudder to center position
+                if (this.rudderAngle > 0) {
+                    this.rudderAngle = Math.max(0, this.rudderAngle - rudderChangeRate);
+                } else if (this.rudderAngle < 0) {
+                    this.rudderAngle = Math.min(0, this.rudderAngle + rudderChangeRate);
+                }
+                break;
+        }
+        
+        // Update wheel angle to match rudder angle (if we have wheels)
+        if (this.wheels.size > 0) {
+            // Get the first wheel (typically there's only one)
+            const wheel = this.wheels.values().next().value;
+            if (wheel) {
+                wheel.setWheelAngle(this.rudderAngle);
+            }
+        }
+        
+        // Calculate sail power to correlate turning with wind force
+        let sailPower = 0;
+        let sailCount = 0;
+        
+        // Calculate average sail openness and efficiency using the typed collection
+        this.sails.forEach(sail => {
+            if (sail.openness > 0) {
+                sailPower += sail.openness;
+                sailCount += 1;
+            }
+        });
+        
+        // Get average sail power as a factor between 0 and 1
+        const avgSailPower = sailCount > 0 ? sailPower / (sailCount * 100) : 0;
+        
+        // Calculate base turning force with improved speed-based mechanics
+        const baseTurningPower = 0.000015; // Base turning power constant
+        
+        // IMPROVED TURNING LOGIC: Base turning on ship speed
+        // At very low speeds: difficult to turn (0.3 effectiveness)
+        // At medium speeds: optimal turning (1.0 effectiveness)
+        // At high speeds: harder to turn due to momentum (0.5 effectiveness)
+        
+        // Calculate speed factor - optimal turning at medium speeds
+        // This creates a bell curve with max turning at moderate speeds
+        const optimalSpeed = 2.0; // Speed at which turning is most effective
+        const speedDiff = Math.abs(currentSpeed - optimalSpeed);
+        
+        // Create a more pronounced bell curve for speed-based turning
+        // This makes the difference between low, medium and high speeds more noticeable
+        const speedFactor = Math.max(0.25, Math.min(1.0, 1.0 - Math.pow(speedDiff / 3.0, 2)));
+        
+        // Calculate momentum resistance - faster ships are harder to turn
+        // More progressive resistance as momentum builds up
+        const momentumResistance = Math.max(0.4, 1.0 - (this.momentum * 0.6));
+        
+        // Combine factors for final turn effectiveness
+        const turnEffectiveness = speedFactor * momentumResistance;
+        
+        // Apply sail power as a factor (no sails = reduced turning)
+        // Increased minimum turning capability even with closed sails
+        // Make turning more directly dependent on sail openness
+        const minTurnFactor = 0.35; // Minimum turning factor with no sails (increased from 0.3)
+        const maxTurnFactor = 1.0;  // Maximum turning factor with full sails
+        const sailFactor = minTurnFactor + ((maxTurnFactor - minTurnFactor) * avgSailPower);
+        
+        // Calculate final turning force
+        this.turningForce = this.rudderAngle * baseTurningPower * turnEffectiveness * sailFactor;
+        
+        // Apply the turning force as a torque
+        // We now apply force even when the ship is stationary (as long as sails are open)
+        // This allows the ship to start turning from a standstill
+        if (currentSpeed > 0.05 || avgSailPower > 0) {
+            Matter.Body.setAngularVelocity(this.body!, this.body!.angularVelocity + this.turningForce);
+        }
+    }
+    
+    /**
+     * Calculate the efficiency of the sails based on their angle relative to the wind
+     */
+    calculateSailEfficiency(): number {
+        // Get sail angles across all sails
+        let totalEfficiency = 0;
+        let sailCount = 0;
+        
+        // Use the typed sails collection
+        this.sails.forEach(sailModule => {
+            if (sailModule.openness > 0) {
+                const sailAngle = sailModule.angle;
+                
+                // Calculate angle between wind and sail
+                // We need to account for:
+                // 1. The ship's orientation (body.angle)
+                // 2. The sail's rotation relative to the ship (sailAngle)
+                // 3. The wind direction
+                
+                // Convert sail angle from degrees to radians
+                const sailAngleRad = sailAngle * Math.PI / 180;
+                
+                // Calculate the sail's normal vector (perpendicular to sail face)
+                // The sail normal is perpendicular to its face and indicates which way it's pointing
+                const sailNormalAngle = this.body!.angle + sailAngleRad + Math.PI/2; // Add 90 degrees to get normal
+                
+                // Calculate sail direction vector components (normal to sail face)
+                const sailNormalX = Math.cos(sailNormalAngle);
+                const sailNormalY = Math.sin(sailNormalAngle);
+                
+                // Use the wind direction from the ship's current wind direction
+                const physicsWindDirection = this.currentWindDirection;
+                
+                // Calculate wind direction vector components (where the wind is going)
+                const windDirX = Math.cos(physicsWindDirection);
+                const windDirY = Math.sin(physicsWindDirection);
+                
+                // Calculate dot product between wind direction and sail normal
+                // Positive dot product: wind hits sail from front
+                // Negative dot product: wind hits sail from behind
+                const dotProduct = windDirX * sailNormalX + windDirY * sailNormalY;
+                
+                // Calculate angle between wind direction and sail normal vector
+                let windSailAngleDiff = Math.acos(Math.min(1, Math.max(-1, dotProduct)));
+                
+                // Convert angle to degrees
+                const angleDiffDegrees = windSailAngleDiff * 180 / Math.PI;
+                
+                let efficiency = 0;
+                
+                // Only consider angles within +/- 90 degrees of the wind direction for optimal efficiency
+                if (angleDiffDegrees <= 90) {
+                    // Linear interpolation from 1.0 (direct) to 0.35 (90 degrees off)
+                    // When angleDiffDegrees = 0: efficiency = 1.0
+                    // When angleDiffDegrees = 90: efficiency = 0.35
+                    efficiency = 1.0 - (0.65 * angleDiffDegrees / 90);
+                } else {
+                    // Default to 35% efficiency when outside the optimal range
+                    efficiency = 0.35;
+                }
+                
+                // Scale efficiency from 0-1 range
+                efficiency = Math.min(1, Math.max(0.35, efficiency));
+                
+                // Scale by sail openness
+                const sailOpenness = sailModule.openness / 100;
+                
+                // Only add angle bonus if we already have some efficiency
+                let angleBonus = 0;
+                if (efficiency > 0) {
+                    // Add a bonus for angled sails - this rewards using the wider range
+                    // Sails angled more dramatically catch more wind when appropriate
+                    angleBonus = Math.min(0.2, Math.abs(sailAngle) / 75 * 0.2);
+                }
+                
+                // Apply sail openness as a direct multiplier to efficiency
+                // This ensures that sail openness directly affects how much power the sail generates
+                totalEfficiency += (efficiency + angleBonus) * sailOpenness;
+                sailCount++;
+            }
+        });
+        
+        // Always provide at least some minimal efficiency when sails are open
+        // Return a value between 0 and 1.5 (capped at 150% efficiency)
+        if (sailCount > 0) {
+            // Base efficiency is the average across all sails
+            const baseEfficiency = Math.min(1.5, totalEfficiency / sailCount);
+            
+            // Ensure there's always a minimum efficiency of 0.2 (20%) when any sails are open
+            // This provides a more consistent sailing experience
+            return Math.max(0.2, baseEfficiency);
+        }
+        
+        return 0; // No sails open = no efficiency
+    }
+    
+    /**
+     * Apply wind force to the ship based on sail efficiency
+     */
+    applyWindForce(windDirection: number, windPower: number): void {
+        // Store current wind values for sail efficiency calculations
+        this.currentWindDirection = windDirection;
+        this.currentWindPower = windPower;
+
+        // Only apply force if we have open sails
+        if (this.sails.size === 0) {
+            return;
+        }
+
+        // Calculate sail efficiency
+        const efficiency = this.calculateSailEfficiency();
+        
+        // Calculate base force magnitude based on wind power and sail efficiency
+        const forceMagnitude = 0.01 * windPower * efficiency;
+
+        // Force is always applied in the direction the ship is facing
+        // This simulates the ship's ability to harness wind from various directions
+        const forceX = Math.cos(this.body!.angle + Math.PI/2) * forceMagnitude;
+        const forceY = Math.sin(this.body!.angle + Math.PI/2) * forceMagnitude;
+
+        // Apply the force at the ship's center of mass
+        Matter.Body.applyForce(this.body!, this.body!.position, {
+            x: forceX,
+            y: forceY
+        });
+
+        // Store the forward force for momentum calculations
+        this.forwardForce = forceMagnitude;
+    }
+    
+    /**
+     * Rotate all sails by a certain angle
+     */
+    rotateSails(direction: 'left' | 'right' | 'center'): void {
+        const rotationRate = 1.25; // Degrees per call
+        
+        // Store current velocity before rotation
+        const currentVelocity = {
+            x: this.body!.velocity.x,
+            y: this.body!.velocity.y
+        };
+        
+        // Set flag to indicate sails are being rotated (just for animation purposes)
+        this.isRotatingSails = true;
+        this.sailRotationTimer = 10; // Set timer for how long sails are considered rotating
+        
+        // Use the typed sails collection
+        this.sails.forEach(sail => {
+            // Adjust angle based on direction
+            switch (direction) {
+                case 'left':
+                    sail.rotate(-rotationRate); // Use SailModule's rotate method
+                    break;
+                case 'right':
+                    sail.rotate(rotationRate);
+                    break;
+                case 'center':
+                    // Return sails to center position
+                    sail.centerAngle(rotationRate);
+                    break;
+            }
+        });
+        
+        // Restore exact velocity from before rotation to prevent cumulative speed increases
+        Matter.Body.setVelocity(this.body!, currentVelocity);
+    }
+    
+    /**
+     * Open all sails
+     */
+    openSails(): void {
+        this.sails.forEach((sail) => {
+            sail.open();
+        });
+    }
+    
+    /**
+     * Close all sails
+     */
+    closeSails(): void {
+        this.sails.forEach((sail) => {
+            sail.close();
+        });
     }
     
     /**
@@ -890,10 +1309,17 @@ export class Brigantine extends Ships {
         this.drawPlanks(ctx);
         
         // Draw the boarding ladder
-        this.drawBoardingLadder(ctx);
-        
-        // Draw the masts
+        this.drawBoardingLadder(ctx);        // Draw the masts
         this.drawMasts(ctx);
+        
+        // Draw ship modules
+        this.modules.forEach(module => {
+            if (module instanceof SailModule) {
+                module.draw(ctx);
+            } else if (module instanceof WheelModule) {
+                module.draw(ctx);
+            }
+        });
         
         // Restore context
         ctx.restore();
