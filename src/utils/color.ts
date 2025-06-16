@@ -29,6 +29,7 @@ export class Color {
     static readonly UI_BACKGROUND: string = 'rgba(0, 0, 0, 0.7)';
     static readonly UI_TEXT: string = '#FFFFFF';
     static readonly UI_HIGHLIGHT: string = '#FFD700'; // Gold
+    static readonly MODULE_HIGHLIGHT: string = 'rgba(255, 255, 0, 0.6)'; // Yellow highlight for hovered modules
     static readonly COMPASS_N: string = '#FF0000'; // Red for North
     static readonly COMPASS_DIRECTION: string = '#FFFFFF';
       // Debug colors
@@ -79,5 +80,8 @@ export const CollisionCategories = {
     POWERUP: 0x0010,
     TREASURE: 0x0020,
     ISLAND: 0x0040,
+    DECK_ELEMENT: 0x0080, // New category for masts, planks, etc. on deck
+    MODULE: 0x0100, // New category for ship modules
+    SAIL_FIBER: 0x0200, // New category specifically for sail fibers/cloth
     ALL: 0xFFFFFFFF
 };

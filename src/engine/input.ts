@@ -231,4 +231,12 @@ export class Input {
             }
         }
     }
+    
+    /**
+     * Clear a key from the pressed keys list
+     * @param key The key to clear
+     */
+    public clearKey(key: string): void {
+        this.keys.delete(key.toLowerCase());
+    }
 }

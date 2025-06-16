@@ -16,6 +16,7 @@ import { EffectManager } from './objects/effects/effectManager';
 import { WaterSplash } from './objects/effects/waterSplash';
 import { Explosion } from './objects/effects/explosion';
 import { Cannons } from './objects/shipModules/cannons';
+import { WheelModule } from './objects/shipModules/WheelModule';
 import * as Matter from 'matter-js';
 import { Brigantine } from './objects/ships/brigantine';
 import { Ships } from './objects/ships/ships';
@@ -85,9 +86,15 @@ export class Game {
         
         // Set world generator on renderer
         this.renderer.setWorldGenerator(this.worldGenerator);
-        
-        // Set physics on renderer for debug visualization
+          // Set physics on renderer for debug visualization
         this.renderer.setPhysics(this.physics);
+        
+        // Enable debug mode and physics visualization by default for development
+        BaseGameObject.setDebugMode(true);
+        this.renderer.setShowDebugHUD(true);
+        this.renderer.setShowPhysicsWorld(true);
+        this.showPhysicsWorld = true;
+        console.log("Debug mode and physics visualization enabled by default");
           // Create player and brigantine with some distance between them
         const centerX = this.canvas.getWidth() / 2;
         const centerY = this.canvas.getHeight() / 2;
@@ -103,6 +110,9 @@ export class Game {
         // Add player to physics engine and renderer
         this.physics.addBody(this.player.getBody()!);
         this.renderer.addGameObject(this.player);
+        
+        // Set a higher z-index for the player so it renders on top of ships when boarded
+        this.player.setZIndex(10);
         
         // Initialize enemy-related properties
         this.enemies = [];
@@ -167,6 +177,15 @@ export class Game {
         const ctx = this.canvas.getContext();
         if (ctx) {
             this.effectManager.render(ctx);
+            
+            // Apply camera transform to get proper world coordinates for tooltips
+            this.camera.applyTransform(ctx);
+            
+            // Render module tooltips
+            this.renderModuleTooltips(ctx);
+            
+            // Reset camera transform
+            this.camera.resetTransform(ctx);
         }
         
         // Continue the game loop
@@ -185,17 +204,11 @@ export class Game {
         // Update player
         this.player.update(delta);
         
-        // Check if player is dead
-        if (this.player.isDead()) {
-            this.gameState.setGameOver();
-            this.soundManager.playSound('sinking');
-            this.soundManager.playMusic('gameover', true);
-            
-            // Create explosion effect at player position
-            const playerPos = this.player.getPosition();
-            this.effectManager.createExplosion(playerPos.x, playerPos.y, 80);
-            return;
-        }
+        // Handle ship controls if player is controlling a wheel
+        this.handleShipControls();
+        
+        // Update module hover interaction
+        this.updateModuleHoverInteraction();
         
         // Update camera
         this.camera.update();
@@ -207,9 +220,21 @@ export class Game {
         this.islandGenerator.update();
         
         // Update enemy spawn timer and spawn new enemies
-        this.updateEnemies(delta);        // Update all ships to sync their visual coordinates with physics bodies
+        this.updateEnemies(delta);
+        
+        // Update all ships to sync their visual coordinates with physics bodies
         for (const ship of this.ships) {
             ship.update(delta);
+            
+            // If the player is on this ship and it's a Brigantine, update player physics
+            if (this.player.isOnBoard() && 
+                this.player.getBoardedShip() === ship && 
+                ship instanceof Brigantine && 
+                this.player.getBody()) {
+                
+                // Update the player's physics based on the ship's movement
+                ship.updateBoardedPlayer(this.player.getBody()!, delta);
+            }
         }
         
         // Update ships' ladder highlight states based on player proximity and mouse position
@@ -326,6 +351,9 @@ export class Game {
         if (this.input.wasKeyJustPressed('e')) {
             console.log('E KEY WAS JUST PRESSED - Detected in testKeyPressHandling');
         }
+        
+        // Check for module hover interaction
+        this.updateModuleHoverInteraction();
     }
     
     /**
@@ -422,19 +450,34 @@ export class Game {
             if (enemy.isDead()) {
                 // Remove from physics engine
                 this.physics.removeBody(enemy.getBody()!);
-                
-                // Remove from renderer
+                  // Remove from renderer
                 this.renderer.removeGameObject(enemy);
                 
                 // Remove from enemies array
                 this.enemies.splice(i, 1);
             }
         }
-    }    private spawnBrigantine(spawnX: number, spawnY: number): Brigantine {
-        // Create a new brigantine enemy ship
+    }      private spawnBrigantine(spawnX: number, spawnY: number): Brigantine {        // Create a new brigantine enemy ship
         const brigantine: Brigantine = new Brigantine(spawnX, spawnY);
         this.physics.addBody(brigantine.getBody()!);
         this.renderer.addGameObject(brigantine);
+        
+        // Set the physics engine on the brigantine so modules can be added to the right world
+        brigantine.setPhysicsEngine(this.physics);
+        
+        // Set a lower z-index for ships so the player renders on top when boarded
+        brigantine.setZIndex(5);
+          // Create the plank bodies for the ship
+        try {
+            // Call the createPlankBodies method using explicit type assertion
+            (brigantine as any).createPlankBodies(this.physics);
+            
+            // Also create the mast bodies for collision
+            (brigantine as any).createMastBodies(this.physics);
+        } catch (error) {
+            console.error("Error creating ship physics bodies:", error);
+        }
+        
         this.ships.push(brigantine);
         console.log(`Spawned brigantine at (${Math.round(spawnX)}, ${Math.round(spawnY)})`);
         return brigantine;
@@ -455,14 +498,14 @@ export class Game {
         
         // Set player as its target
         enemy.setTarget(this.player);
-        
-        // Add to physics engine
+          // Add to physics engine
         this.physics.addBody(enemy.getBody()!);
         
         // Add to renderer
         this.renderer.addGameObject(enemy);
         
-        // Add to enemies array
+        // Set a lower z-index for enemy ships, same as player ships
+        enemy.setZIndex(5);// Add to enemies array
         this.enemies.push(enemy);
         
         console.log(`Spawned enemy ship at (${Math.round(spawnX)}, ${Math.round(spawnY)})`);
@@ -645,6 +688,9 @@ export class Game {
         
         this.physics.addBody(this.player.getBody()!);
         this.renderer.addGameObject(this.player);
+        
+        // Set a higher z-index for the player so it renders on top of ships when boarded
+        this.player.setZIndex(10);
         
         // Remove all enemies
         for (const enemy of this.enemies) {
@@ -888,54 +934,54 @@ export class Game {
         // If brigantine has a physics body, give it a small initial velocity toward the player
         if (brigantine) {
             const body = brigantine.getBody();
-            if (body) {
-                // Calculate velocity towards player
-                const velocityMagnitude = 2; // Initial speed (reduced for more controlled test)
-                const velocityX = -Math.cos(playerAngle) * velocityMagnitude;
-                const velocityY = -Math.sin(playerAngle) * velocityMagnitude;
+            // if (body) {
+            //     // Calculate velocity towards player
+            //     const velocityMagnitude = 2; // Initial speed (reduced for more controlled test)
+            //     const velocityX = -Math.cos(playerAngle) * velocityMagnitude;
+            //     const velocityY = -Math.sin(playerAngle) * velocityMagnitude;
                 
-                // Set the initial velocity
-                Matter.Body.setVelocity(body, { x: velocityX, y: velocityY });
+            //     // Set the initial velocity
+            //     Matter.Body.setVelocity(body, { x: velocityX, y: velocityY });
                 
-                // Ensure the brigantine is facing the player
-                const angleToPlayer = Math.atan2(-offsetY, -offsetX);
-                Matter.Body.setAngle(body, angleToPlayer);
+            //     // Ensure the brigantine is facing the player
+            //     const angleToPlayer = Math.atan2(-offsetY, -offsetX);
+            //     Matter.Body.setAngle(body, angleToPlayer);
                 
-                // Test collision filtering between player and brigantine
-                const playerBody = this.player.getBody();
-                if (playerBody) {
-                    // Check if collision filtering is set up correctly
-                    this.physics.checkCollisionFiltering(playerBody, body);
+            //     // Test collision filtering between player and brigantine
+            //     const playerBody = this.player.getBody();
+            //     if (playerBody) {
+            //         // Check if collision filtering is set up correctly
+            //         this.physics.checkCollisionFiltering(playerBody, body);
                     
-                    // Log positions for debugging
-                    console.log(`Player position: (${playerBody.position.x.toFixed(2)}, ${playerBody.position.y.toFixed(2)})`);
-                    console.log(`Brigantine position: (${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)})`);
-                    console.log(`Distance between bodies: ${
-                        Math.sqrt(
-                            Math.pow(playerBody.position.x - body.position.x, 2) +
-                            Math.pow(playerBody.position.y - body.position.y, 2)
-                        ).toFixed(2)
-                    }`);
+            //         // Log positions for debugging
+            //         console.log(`Player position: (${playerBody.position.x.toFixed(2)}, ${playerBody.position.y.toFixed(2)})`);
+            //         console.log(`Brigantine position: (${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)})`);
+            //         console.log(`Distance between bodies: ${
+            //             Math.sqrt(
+            //                 Math.pow(playerBody.position.x - body.position.x, 2) +
+            //                 Math.pow(playerBody.position.y - body.position.y, 2)
+            //             ).toFixed(2)
+            //         }`);
                     
-                    // Increase size of the physics bodies to make collision more likely
-                    // This is for testing purposes only
-                    console.log("Increasing physics body sizes for more reliable collision detection");
+            //         // Increase size of the physics bodies to make collision more likely
+            //         // This is for testing purposes only
+            //         console.log("Increasing physics body sizes for more reliable collision detection");
                     
-                    // Slightly increase player's collision radius by scaling
-                    const scaleFactor = 1.2; // 20% larger
-                    const scale = {
-                        x: scaleFactor,
-                        y: scaleFactor
-                    };
+            //         // Slightly increase player's collision radius by scaling
+            //         const scaleFactor = 1.2; // 20% larger
+            //         const scale = {
+            //             x: scaleFactor,
+            //             y: scaleFactor
+            //         };
                     
-                    // Scale up the player's physics body
-                    Matter.Body.scale(playerBody, scale.x, scale.y);
-                    console.log(`Player body scaled by ${scaleFactor}x`);
+            //         // Scale up the player's physics body
+            //         Matter.Body.scale(playerBody, scale.x, scale.y);
+            //         console.log(`Player body scaled by ${scaleFactor}x`);
                     
-                    // Also check for manual collision
-                    this.physics.manualCollisionCheck();
-                }
-            }
+            //         // Also check for manual collision
+            //         this.physics.manualCollisionCheck();
+            //     }
+            // }
         }
         
         console.log("Spawned brigantine in front of player for collision testing");
@@ -1010,19 +1056,63 @@ export class Game {
             boardedShip.renderBoardedUI(ctx);
         }
     }
-    
-    /**
+      /**
      * Handles interaction when the 'E' key is pressed
      * This is called directly by the Input system
-     */
-    private handleInteraction(): void {
+     */    private handleInteraction(): void {
         // If game is over, ignore interaction
         if (this.gameState.isGameOver()) return;
         
-        // Check if player is already on a ship - if so, handle unboarding
+        // Check if player is already on a ship - if so, handle unboarding, but only if near the ladder
         if (this.player.isOnBoard()) {
-            console.log('🔑 INTERACT: Player is disembarking from ship');
-            this.player.unboardShip();
+            const boardedShip = this.player.getBoardedShip();
+            if (boardedShip instanceof Brigantine) {
+                const playerPos = this.player.getPosition();
+                const mouseWorldPos = this.camera.screenToWorld(
+                    this.input.getMousePosition().x, 
+                    this.input.getMousePosition().y
+                );
+                
+                // Check if player is interacting with a module (wheel)
+                const hoveredModule = boardedShip.getModuleAtPoint(mouseWorldPos.x, mouseWorldPos.y);
+                if (hoveredModule && hoveredModule instanceof WheelModule) {
+                    // Toggle wheel control
+                    if (hoveredModule.isPlayerControlling) {
+                        // Release control of the wheel
+                        hoveredModule.setPlayerControlling(false);
+                        console.log('🔑 INTERACT: Player released control of the wheel');
+                    } else {
+                        // Take control of the wheel                        // First, release control of any other wheels
+                        for (const [_, wheel] of boardedShip.wheels.entries()) {
+                            if (wheel.isPlayerControlling) {
+                                wheel.setPlayerControlling(false);
+                            }
+                        }
+                        
+                        // Now take control of this wheel
+                        hoveredModule.setPlayerControlling(true);
+                        console.log('🔑 INTERACT: Player took control of the wheel');
+                    }
+                    return;
+                }
+                
+                // Only allow deboarding if player is at the ladder
+                const inLadderArea = boardedShip.isPointInLadderArea(playerPos.x, playerPos.y, 70);
+                const isHovering = boardedShip.isPointHoveringLadder(mouseWorldPos.x, mouseWorldPos.y);
+                
+                if (inLadderArea && isHovering) {                    // Release control of any wheels before disembarking
+                    for (const [_, wheel] of boardedShip.wheels.entries()) {
+                        if (wheel.isPlayerControlling) {
+                            wheel.setPlayerControlling(false);
+                        }
+                    }
+                    
+                    console.log('🔑 INTERACT: Player is disembarking from ship at the ladder');
+                    this.player.unboardShip();
+                } else {
+                    console.log('🔑 INTERACT: Cannot disembark - Player must be at the ladder');
+                }
+            }
             return;
         }
         
@@ -1078,5 +1168,192 @@ export class Game {
             // Log why boarding failed
             console.log(`🔑 INTERACT: Cannot board - Player near ladder: ${playerInLadderArea ? '✅' : '❌'} | Mouse hovering ladder: ${mouseHoveringLadder ? '✅' : '❌'} | Ship available: ${nearestShip !== null ? '✅' : '❌'}`);
         }
+    }
+      /**
+     * Check for module hover interaction
+     * This detects when the mouse is hovering over ship modules and updates their hover state
+     */
+    private updateModuleHoverInteraction(): void {
+        // Get mouse position in screen coordinates
+        const mouseScreenPos = this.input.getMousePosition();
+        
+        // Convert to world coordinates
+        const mouseWorldPos = this.camera.screenToWorld(mouseScreenPos.x, mouseScreenPos.y);
+          // Reset hover state for all modules
+        let moduleHovered = false;
+          // If the player is boarded on a ship, check for module hover on that ship
+        if (this.player.isOnBoard()) {
+            const boardedShip = this.player.getBoardedShip();
+            if (boardedShip && boardedShip instanceof Brigantine) {                // Reset hover state on all modules
+                for (const [_, sail] of boardedShip.sails.entries()) {
+                    sail.setHovered(false);
+                }
+                for (const [_, wheel] of boardedShip.wheels.entries()) {
+                    wheel.setHovered(false);
+                }
+                
+                // Add debug info periodically
+                if (Math.random() < 0.01) { // Only log occasionally
+                    console.log(`Mouse world position: (${mouseWorldPos.x}, ${mouseWorldPos.y})`);
+                    // Test plank hover detection
+                    boardedShip.testPlankHover(mouseWorldPos.x, mouseWorldPos.y);
+                }
+                
+                // Check if mouse is hovering over any module
+                const hoveredModule = boardedShip.getModuleAtPoint(mouseWorldPos.x, mouseWorldPos.y);
+                if (hoveredModule) {
+                    // For PlankModule, hover is already set in the constructor
+                    if (hoveredModule.type !== 'plank') {
+                        hoveredModule.setHovered(true);
+                    }
+                    moduleHovered = true;
+                    
+                    // Log that we found a hovered module occasionally
+                    if (Math.random() < 0.01) {
+                        console.log(`Hover detected over ${hoveredModule.type} module`);
+                    }
+                }
+            }
+        } else {
+            // If the player is not boarded, check all ships for ladder hover
+            for (const ship of this.ships) {
+                if (ship instanceof Brigantine) {
+                    const isHovering = ship.isPointHoveringLadder(mouseWorldPos.x, mouseWorldPos.y);
+                    ship.setPlayerHovering(isHovering);
+                }
+            }
+        }
+    }    /**
+     * Render module tooltips
+     * This renders tooltips for any hovered modules
+     */
+    private renderModuleTooltips(ctx: CanvasRenderingContext2D): void {
+        // If the player is boarded on a ship
+        if (this.player.isOnBoard()) {
+            const boardedShip = this.player.getBoardedShip();
+            if (boardedShip && boardedShip instanceof Brigantine) {
+                // Get mouse position for debug info
+                const mouseScreenPos = this.input.getMousePosition();
+                const mouseWorldPos = this.camera.screenToWorld(mouseScreenPos.x, mouseScreenPos.y);
+                
+                // Check for hover over any module (including planks)
+                const hoveredModule = boardedShip.getModuleAtPoint(mouseWorldPos.x, mouseWorldPos.y);
+                
+                // If we have a hovered module, render its tooltip
+                if (hoveredModule && hoveredModule.getIsHovered()) {
+                    hoveredModule.renderTooltip(ctx);
+                    return; // Only show one tooltip at a time
+                }
+                  // Fallback to iterating through each module type if needed
+                for (const [_, sail] of boardedShip.sails.entries()) {
+                    if (sail.getIsHovered()) {
+                        sail.renderTooltip(ctx);
+                    }
+                }
+                
+                for (const [_, wheel] of boardedShip.wheels.entries()) {
+                    if (wheel.getIsHovered()) {
+                        wheel.renderTooltip(ctx);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Handle ship controls when player is at the wheel
+     */
+    private handleShipControls(): void {
+        // Check if player is on board a ship
+        if (!this.player.isOnBoard()) return;
+        
+        const boardedShip = this.player.getBoardedShip();
+        if (!(boardedShip instanceof Brigantine)) return;        // Check if player is controlling any wheel
+        let controllingWheel: WheelModule | null = null;
+        for (const [_, wheel] of boardedShip.wheels.entries()) {
+            if (wheel.isPlayerControlling) {
+                controllingWheel = wheel;
+                break;
+            }
+        }
+        
+        // If player is not controlling any wheel, return
+        if (!controllingWheel) return;
+        
+        // Track the keys that were handled
+        const handledKeys = new Set<string>();
+        
+        // WASD controls for ship steering:
+        // W/S - Control sail openness
+        // A/D - Control rudder (turning)
+        // Shift+A/D - Rotate sails
+        
+        // Sail openness controls (W/S)
+        if (this.input.isKeyDown('w') && !this.input.isKeyDown('s')) {
+            // Open sails with W
+            boardedShip.openSails();
+            // Add to handled keys
+            handledKeys.add('w');
+        } 
+        else if (this.input.isKeyDown('s') && !this.input.isKeyDown('w')) {
+            // Close sails with S
+            boardedShip.closeSails();
+            // Add to handled keys
+            handledKeys.add('s');
+        }
+        
+        // Rudder controls (A/D)
+        if (this.input.isKeyDown('a') && !this.input.isKeyDown('d') && !this.input.isKeyDown('shift')) {
+            // Turn left with A
+            boardedShip.applyRudder('left');
+            // Update wheel visual angle
+            controllingWheel.turnLeft();
+            // Add to handled keys
+            handledKeys.add('a');
+        } 
+        else if (this.input.isKeyDown('d') && !this.input.isKeyDown('a') && !this.input.isKeyDown('shift')) {
+            // Turn right with D
+            boardedShip.applyRudder('right');
+            // Update wheel visual angle
+            controllingWheel.turnRight();
+            // Add to handled keys
+            handledKeys.add('d');
+        }
+        else if (!this.input.isKeyDown('a') && !this.input.isKeyDown('d') && !this.input.isKeyDown('shift')) {
+            // Return rudder to center position when no keys are pressed
+            boardedShip.applyRudder('center');
+            // Center wheel visual angle
+            controllingWheel.centerWheel();
+        }
+        
+        // Sail rotation controls (Shift+A/D)
+        if (this.input.isKeyDown('shift')) {
+            handledKeys.add('shift');
+            
+            if (this.input.isKeyDown('a') && !this.input.isKeyDown('d')) {
+                // Rotate sails left with Shift+A
+                boardedShip.rotateSails('left');
+                // Add to handled keys
+                handledKeys.add('a');
+            } 
+            else if (this.input.isKeyDown('d') && !this.input.isKeyDown('a')) {
+                // Rotate sails right with Shift+D
+                boardedShip.rotateSails('right');
+                // Add to handled keys
+                handledKeys.add('d');
+            }
+            else {
+                // If no A/D pressed with Shift, center sails
+                boardedShip.rotateSails('center');
+            }
+        }
+        
+        // Clear handled keys from input to prevent double handling
+        handledKeys.forEach(key => {
+            // Only clear W/S after handling to prevent continuous adjustment
+            if (key === 'w' || key === 's') {
+                this.input.clearKey(key);
+            }
+        });
     }
 }
